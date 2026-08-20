@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Star, BookOpen, BookmarkPlus, BookmarkCheck, Heart, Eye, Share2, Lock, Check } from 'lucide-react';
-import { NOVELS, CHAPTERS } from '../data/novels';
+import { Novel, Chapter } from '../data/novels';
 import { COMMENTS } from '../data/users';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { novelApi, userApi } from '../lib/resources';
+import { ApiError } from '../lib/api';
 
 type Tab = 'chapters' | 'about' | 'comments';
 
@@ -11,33 +14,95 @@ export default function NovelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState<Tab>('chapters');
-  const [bookmarked, setBookmarked] = useState(false);
-  const [favorited, setFavorited] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
   const [unlockChapter, setUnlockChapter] = useState<number | null>(null);
 
-  const novel = NOVELS.find(n => n.id === Number(id));
-  if (!novel) return (
+  const [novel, setNovel] = useState<Novel | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([novelApi.show(id), novelApi.chapters(id)])
+      .then(([n, ch]) => {
+        if (cancelled) return;
+        setNovel(n);
+        setChapters(ch);
+      })
+      .catch(err => { if (!cancelled) setError(err instanceof ApiError ? err.message : 'Failed to load novel.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const comments = COMMENTS.filter(c => c.novelId === novel?.id);
+
+  const toggleBookmark = async () => {
+    if (!novel) return;
+    if (!isAuthenticated) { navigate('/login'); return; }
+    setBusy(true);
+    try {
+      if (novel.isBookmarked) {
+        await userApi.removeBookmark(novel.id);
+      } else {
+        await userApi.addBookmark(novel.id);
+      }
+      setNovel({ ...novel, isBookmarked: !novel.isBookmarked });
+    } catch {
+      // ignore — leave state unchanged
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!novel) return;
+    if (!isAuthenticated) { navigate('/login'); return; }
+    setBusy(true);
+    try {
+      if (novel.isFavorite) {
+        await userApi.removeFavorite(novel.id);
+      } else {
+        await userApi.addFavorite(novel.id);
+      }
+      setNovel({ ...novel, isFavorite: !novel.isFavorite });
+    } catch {
+      // ignore
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReadChapter = (chapterNum: number, isPremium: boolean, isUnlocked?: boolean) => {
+    if (isPremium && !isUnlocked) {
+      setUnlockChapter(chapterNum);
+      setShowUnlock(true);
+    } else {
+      navigate(`/read/${novel!.id}/${chapterNum}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="w-8 h-8 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !novel) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <p className="text-gray-500 dark:text-gray-400 mb-4">Novel not found</p>
+        <p className="text-gray-500 dark:text-gray-400 mb-4">{error || 'Novel not found'}</p>
         <Link to="/" className="btn-primary px-6 py-2.5 rounded-xl">Back to Home</Link>
       </div>
     </div>
   );
-
-  const chapters = CHAPTERS.filter(c => c.novelId === novel.id);
-  const comments = COMMENTS.filter(c => c.novelId === novel.id);
-
-  const handleReadChapter = (chapterNum: number, isPremium: boolean) => {
-    if (isPremium) {
-      setUnlockChapter(chapterNum);
-      setShowUnlock(true);
-    } else {
-      navigate(`/read/${novel.id}/${chapterNum}`);
-    }
-  };
 
   return (
     <div className="max-w-4xl mx-auto pb-8">
@@ -95,14 +160,14 @@ export default function NovelDetailPage() {
               <BookOpen className="w-4 h-4" />
               {t.readNow}
             </button>
-            <button onClick={() => setBookmarked(!bookmarked)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full border text-sm font-medium transition-colors ${bookmarked ? 'bg-[#e91e8c]/10 border-[#e91e8c] text-[#e91e8c]' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-[#e91e8c] hover:text-[#e91e8c]'}`}>
-              {bookmarked ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
-              {bookmarked ? 'Saved' : 'Save'}
+            <button onClick={toggleBookmark} disabled={busy}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full border text-sm font-medium transition-colors ${novel.isBookmarked ? 'bg-[#e91e8c]/10 border-[#e91e8c] text-[#e91e8c]' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-[#e91e8c] hover:text-[#e91e8c]'}`}>
+              {novel.isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
+              {novel.isBookmarked ? 'Saved' : 'Save'}
             </button>
-            <button onClick={() => setFavorited(!favorited)}
-              className={`p-2.5 rounded-full border transition-colors ${favorited ? 'bg-red-50 dark:bg-red-900/20 border-red-400 text-red-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-500'}`}>
-              <Heart className={`w-4 h-4 ${favorited ? 'fill-red-500' : ''}`} />
+            <button onClick={toggleFavorite} disabled={busy}
+              className={`p-2.5 rounded-full border transition-colors ${novel.isFavorite ? 'bg-red-50 dark:bg-red-900/20 border-red-400 text-red-500' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-500'}`}>
+              <Heart className={`w-4 h-4 ${novel.isFavorite ? 'fill-red-500' : ''}`} />
             </button>
           </div>
         </div>
@@ -150,18 +215,10 @@ export default function NovelDetailPage() {
         {tab === 'chapters' && (
           <div className="space-y-2">
             {chapters.length === 0 ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-[#e91e8c]/30 transition-colors">
-                  <div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">Chapter {i + 1}</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Published May {10 - i}, 2024</p>
-                  </div>
-                  <button onClick={() => navigate(`/read/${novel.id}/${i + 1}`)} className="text-xs font-semibold text-[#e91e8c] hover:text-[#c41578]">Read</button>
-                </div>
-              ))
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">No chapters published yet.</div>
             ) : chapters.map(ch => (
               <div key={ch.id} className={`flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer ${ch.isRead ? 'border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/20' : 'border-gray-100 dark:border-gray-800 hover:border-[#e91e8c]/30'}`}
-                onClick={() => handleReadChapter(ch.number, ch.isPremium)}>
+                onClick={() => handleReadChapter(ch.number, ch.isPremium, ch.isUnlocked)}>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">Chapter {ch.number}</span>
@@ -169,7 +226,7 @@ export default function NovelDetailPage() {
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ch.title} · Published {ch.publishedAt}</p>
                 </div>
-                {ch.isPremium ? (
+                {ch.isPremium && !ch.isUnlocked ? (
                   <span className="flex items-center gap-1 text-xs font-medium text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 rounded-full">
                     <Lock className="w-3 h-3" />
                     {ch.coinCost} Coins
@@ -177,7 +234,7 @@ export default function NovelDetailPage() {
                 ) : ch.isRead ? (
                   <span className="text-xs text-emerald-500 font-medium">Read</span>
                 ) : (
-                  <span className="text-xs font-semibold text-[#e91e8c]">Free</span>
+                  <span className="text-xs font-semibold text-[#e91e8c]">{ch.isPremium ? 'Unlocked' : 'Free'}</span>
                 )}
               </div>
             ))}
@@ -195,7 +252,7 @@ export default function NovelDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Status', value: novel.status },
-                  { label: 'Language', value: 'English' },
+                  { label: 'Language', value: novel.language.toUpperCase() },
                   { label: 'Chapters', value: String(novel.chapters) },
                   { label: 'Last Updated', value: novel.updatedAt },
                 ].map(d => (
@@ -256,6 +313,9 @@ export default function NovelDetailPage() {
                   </div>
                 </div>
               ))}
+              {comments.length === 0 && (
+                <p className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">No comments yet.</p>
+              )}
             </div>
           </div>
         )}
@@ -273,13 +333,6 @@ export default function NovelDetailPage() {
               </p>
             </div>
             <div className="space-y-3">
-              <button onClick={() => { setShowUnlock(false); navigate(`/read/${novel.id}/${unlockChapter}`); }}
-                className="w-full btn-primary py-3 rounded-xl flex items-center justify-center gap-2">
-                🪙 Use 2 Coins to Unlock
-              </button>
-              <button className="w-full py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                Watch Ad to Unlock
-              </button>
               <Link to="/subscription" onClick={() => setShowUnlock(false)}
                 className="block text-center py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-white text-sm font-semibold hover:opacity-90 transition-opacity">
                 ✨ Subscribe for Unlimited Access

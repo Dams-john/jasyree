@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, BookOpen, Gift, MessageCircle, Tag, Settings } from 'lucide-react';
-import { NOTIFICATIONS } from '../data/users';
+import { Notification } from '../data/users';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
+import { userApi } from '../lib/resources';
 
 const TYPE_ICONS = {
   chapter: BookOpen,
@@ -22,10 +24,44 @@ const TYPE_COLORS = {
 
 export default function NotificationsPage() {
   const { t } = useLanguage();
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const { isAuthenticated } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  useEffect(() => {
+    if (!isAuthenticated) { setLoading(false); return; }
+    let cancelled = false;
+    userApi.notifications(1, 50)
+      .then(res => { if (!cancelled) setNotifications(res.items); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  const markAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    userApi.markAllNotificationsRead().catch(() => {});
+  };
+
+  const markRead = (id: number) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    userApi.markNotificationRead(id).catch(() => {});
+  };
+
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
+        <Bell className="w-10 h-10 text-gray-400 mb-4" />
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Log in to see notifications</h2>
+        <div className="flex gap-3 mt-2">
+          <Link to="/login" className="btn-outline px-6 py-2.5 rounded-xl">Log In</Link>
+          <Link to="/signup" className="btn-primary px-6 py-2.5 rounded-xl">Sign Up</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto pb-8">
@@ -46,7 +82,11 @@ export default function NotificationsPage() {
       </div>
 
       <div className="px-4 pt-3">
-        {notifications.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <span className="w-6 h-6 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+          </div>
+        ) : notifications.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <Bell className="w-8 h-8 text-gray-400" />
@@ -55,14 +95,14 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <div className="space-y-1">
-            {notifications.map((notif, i) => {
+            {notifications.map(notif => {
               const Icon = TYPE_ICONS[notif.type];
               const colorClass = TYPE_COLORS[notif.type];
 
               return (
                 <div key={notif.id}
                   className={`flex gap-3 p-4 rounded-xl transition-colors cursor-pointer ${!notif.isRead ? 'bg-[#e91e8c]/5 dark:bg-[#e91e8c]/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
-                  onClick={() => setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n))}>
+                  onClick={() => markRead(notif.id)}>
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${colorClass}`}>
                     <Icon className="w-5 h-5" />
                   </div>

@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Bookmark, BookmarkCheck, Settings2, Sun, Moon, AlignJustify, ChevronLeft, ChevronRight, X, Type, Maximize2, Minimize2 } from 'lucide-react';
-import { NOVELS, CHAPTERS, CHAPTER_CONTENT } from '../data/novels';
+import { ArrowLeft, Bookmark, BookmarkCheck, Settings2, Sun, Moon, AlignJustify, ChevronLeft, ChevronRight, X, Type, Lock } from 'lucide-react';
+import { Novel, Chapter } from '../data/novels';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { novelApi, userApi } from '../lib/resources';
+import { ApiError } from '../lib/api';
 
 type ReaderTheme = 'dark' | 'light' | 'sepia';
 
@@ -12,6 +15,7 @@ export default function ReadingPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const { isAuthenticated } = useAuth();
 
   const [showUI, setShowUI] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -21,24 +25,90 @@ export default function ReadingPage() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [progress, setProgress] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
-  const hideTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const novel = NOVELS.find(n => n.id === Number(novelId));
+  const [novel, setNovel] = useState<Novel | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
+  const [error, setError] = useState('');
+
   const chN = Number(chapterNum);
-  const chapter = CHAPTERS.find(c => c.novelId === Number(novelId) && c.number === chN);
-  const totalChapters = novel?.chapters || 12;
+  const chapter = chapters.find(c => c.number === chN);
+  const totalChapters = novel?.chapters || chapters.length || 1;
+  const progressReported = useRef(false);
+
+  useEffect(() => {
+    if (!novelId || !chapterNum) return;
+    let cancelled = false;
+    setLoading(true);
+    setLocked(false);
+    setError('');
+    setContent(null);
+    progressReported.current = false;
+
+    (async () => {
+      try {
+        const [n, ch] = await Promise.all([novelApi.show(novelId), novelApi.chapters(novelId)]);
+        if (cancelled) return;
+        setNovel(n);
+        setChapters(ch);
+        setIsBookmarked(!!n.isBookmarked);
+
+        const target = ch.find(c => c.number === Number(chapterNum));
+        if (!target) { setError('Chapter not found.'); return; }
+
+        const full = await novelApi.chapterContent(target.id);
+        if (cancelled) return;
+        setContent(full.content);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 403) {
+          setLocked(true);
+        } else {
+          setError(err instanceof ApiError ? err.message : 'Failed to load chapter.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [novelId, chapterNum]);
+
+  const reportProgress = useCallback((pct: number) => {
+    if (!isAuthenticated || !novel?.translationId || !chapter) return;
+    if (pct >= 90 && progressReported.current) return;
+    if (pct >= 90) progressReported.current = true;
+    userApi.recordProgress(novel.translationId, chapter.id, pct).catch(() => {});
+  }, [isAuthenticated, novel, chapter]);
 
   useEffect(() => {
     const handleScroll = () => {
       const el = contentRef.current;
       if (!el) return;
-      const scrollPct = (el.scrollTop / (el.scrollHeight - el.clientHeight)) * 100;
-      setProgress(Math.min(100, Math.round(scrollPct)));
+      const scrollable = el.scrollHeight - el.clientHeight;
+      const scrollPct = scrollable > 0 ? (el.scrollTop / scrollable) * 100 : 100;
+      const pct = Math.min(100, Math.round(scrollPct));
+      setProgress(pct);
+      reportProgress(pct);
     };
     const el = contentRef.current;
     el?.addEventListener('scroll', handleScroll);
     return () => el?.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [reportProgress]);
+
+  const toggleBookmark = async () => {
+    if (!novel) return;
+    if (!isAuthenticated) { navigate('/login'); return; }
+    try {
+      if (isBookmarked) await userApi.removeBookmark(novel.id);
+      else await userApi.addBookmark(novel.id);
+      setIsBookmarked(!isBookmarked);
+    } catch {
+      // ignore
+    }
+  };
 
   const handleContentClick = () => {
     setShowUI(prev => !prev);
@@ -49,9 +119,29 @@ export default function ReadingPage() {
   const textColor = readerTheme === 'dark' ? '#e2e8f0' : readerTheme === 'sepia' ? '#5c4a32' : '#1a1a2e';
   const toolbarBg = readerTheme === 'dark' ? '#1e1e32' : '#ffffff';
 
-  if (!novel) return (
+  if (loading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center" style={{ background: bgColor }}>
+        <span className="w-8 h-8 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!novel || error) return (
     <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-500">Novel not found</p>
+      <p className="text-gray-500">{error || 'Novel not found'}</p>
+    </div>
+  );
+
+  if (locked) return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center gap-4">
+      <Lock className="w-10 h-10 text-amber-500" />
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Chapter {chN} is locked</h2>
+      <p className="text-gray-500 dark:text-gray-400 max-w-sm">This is a premium chapter. Subscribe to unlock it.</p>
+      <div className="flex gap-3">
+        <Link to={`/novel/${novel.id}`} className="btn-outline px-6 py-2.5 rounded-xl">Back to Novel</Link>
+        <Link to="/subscription" className="btn-primary px-6 py-2.5 rounded-xl">Subscribe</Link>
+      </div>
     </div>
   );
 
@@ -73,7 +163,7 @@ export default function ReadingPage() {
             <p className="text-xs font-bold truncate" style={{ color: textColor }}>{novel.title}</p>
             <p className="text-xs opacity-60" style={{ color: textColor }}>Chapter {chN}</p>
           </div>
-          <button onClick={() => setIsBookmarked(!isBookmarked)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button onClick={toggleBookmark} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
             {isBookmarked ? <BookmarkCheck className="w-5 h-5 text-[#e91e8c]" /> : <Bookmark className="w-5 h-5" style={{ color: textColor }} />}
           </button>
           <button onClick={() => setShowSettings(!showSettings)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
@@ -97,11 +187,11 @@ export default function ReadingPage() {
             <h2 className="text-lg font-bold mb-1" style={{ color: textColor }}>
               Chapter {chN}{chapter ? ` – ${chapter.title}` : ''}
             </h2>
-            <p className="text-xs opacity-50" style={{ color: textColor }}>{chapter?.publishedAt || '2024-05-12'}</p>
+            <p className="text-xs opacity-50" style={{ color: textColor }}>{chapter?.publishedAt}</p>
           </div>
 
           <div className="whitespace-pre-line leading-relaxed select-text" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing, color: textColor, fontFamily: "'Georgia', serif" }}>
-            {CHAPTER_CONTENT}
+            {content}
           </div>
 
           <div className="mt-12 pt-6 border-t opacity-20" style={{ borderColor: textColor }}>
@@ -132,7 +222,7 @@ export default function ReadingPage() {
               <Type className="w-5 h-5 opacity-70" />
               <span className="text-[10px] opacity-60">{t.font}</span>
             </button>
-            <button onClick={() => setReaderTheme(t => t === 'light' ? 'dark' : 'light')} className="flex flex-col items-center gap-0.5" style={{ color: textColor }}>
+            <button onClick={() => setReaderTheme(th => th === 'light' ? 'dark' : 'light')} className="flex flex-col items-center gap-0.5" style={{ color: textColor }}>
               {readerTheme === 'dark' ? <Sun className="w-5 h-5 opacity-70" /> : <Moon className="w-5 h-5 opacity-70" />}
               <span className="text-[10px] opacity-60">{readerTheme === 'dark' ? t.light : t.dark}</span>
             </button>

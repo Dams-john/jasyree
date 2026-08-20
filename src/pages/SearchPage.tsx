@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, SlidersHorizontal } from 'lucide-react';
-import { NOVELS } from '../data/novels';
-import { GENRES } from '../data/genres';
+import { Search, X } from 'lucide-react';
+import { Novel } from '../data/novels';
+import { Genre } from '../data/genres';
 import NovelCard from '../components/ui/NovelCard';
 import { useLanguage } from '../contexts/LanguageContext';
+import { novelApi, genreApi, homeApi } from '../lib/resources';
 
 type SearchTab = 'top' | 'novels' | 'authors' | 'genres';
 
@@ -13,20 +14,38 @@ export default function SearchPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<SearchTab>('top');
-  const [showFilters, setShowFilters] = useState(false);
 
-  const filtered = query.trim()
-    ? NOVELS.filter(n =>
-        n.title.toLowerCase().includes(query.toLowerCase()) ||
-        n.penName.toLowerCase().includes(query.toLowerCase()) ||
-        n.genres.some(g => g.toLowerCase().includes(query.toLowerCase()))
-      )
-    : [];
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [trending, setTrending] = useState<Novel[]>([]);
+  const [results, setResults] = useState<Novel[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  const topResults = filtered.slice(0, 5);
-  const novelResults = filtered;
-  const authorResults = [...new Map(filtered.map(n => [n.penName, n])).values()];
-  const genreResults = GENRES.filter(g => !query || g.name.toLowerCase().includes(query.toLowerCase()));
+  useEffect(() => {
+    genreApi.list().then(setGenres).catch(() => {});
+    homeApi.getTrending().then(setTrending).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const handle = setTimeout(() => {
+      novelApi.search(trimmed, 1, 30)
+        .then(res => { if (!cancelled) setResults(res.items); })
+        .catch(() => { if (!cancelled) setResults([]); })
+        .finally(() => { if (!cancelled) setSearching(false); });
+    }, 350);
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [query]);
+
+  const topResults = results.slice(0, 5);
+  const novelResults = results;
+  const authorResults = [...new Map(results.map(n => [n.penName, n])).values()];
+  const genreResults = genres.filter(g => !query || g.name.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <div className="max-w-2xl mx-auto pb-8">
@@ -83,30 +102,38 @@ export default function SearchPage() {
             </div>
 
             {/* Trending Searches */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Trending</h3>
-              <div className="space-y-3">
-                {NOVELS.slice(0, 5).map((novel, i) => (
-                  <button key={novel.id} onClick={() => navigate(`/novel/${novel.id}`)} className="w-full flex items-center gap-3 hover:opacity-80 transition-opacity">
-                    <span className="w-6 text-sm font-bold text-[#e91e8c]">#{i + 1}</span>
-                    <img src={novel.cover} alt={novel.title} className="w-10 h-14 object-cover rounded-lg" />
-                    <div className="flex-1 text-left">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">{novel.title}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{novel.penName}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1 justify-end">
-                      {novel.genres.slice(0, 1).map(g => (
-                        <span key={g} className="text-[10px] px-1.5 py-0.5 bg-[#e91e8c]/10 text-[#e91e8c] rounded">{g}</span>
-                      ))}
-                    </div>
-                  </button>
-                ))}
+            {trending.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Trending</h3>
+                <div className="space-y-3">
+                  {trending.slice(0, 5).map((novel, i) => (
+                    <button key={novel.id} onClick={() => navigate(`/novel/${novel.id}`)} className="w-full flex items-center gap-3 hover:opacity-80 transition-opacity">
+                      <span className="w-6 text-sm font-bold text-[#e91e8c]">#{i + 1}</span>
+                      <img src={novel.cover} alt={novel.title} className="w-10 h-14 object-cover rounded-lg" />
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">{novel.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{novel.penName}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {novel.genres.slice(0, 1).map(g => (
+                          <span key={g} className="text-[10px] px-1.5 py-0.5 bg-[#e91e8c]/10 text-[#e91e8c] rounded">{g}</span>
+                        ))}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="animate-fade-in">
-            {tab === 'top' && (
+            {searching && (
+              <div className="flex justify-center py-8">
+                <span className="w-6 h-6 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+              </div>
+            )}
+
+            {!searching && tab === 'top' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Results for "{query}"</h3>
                 {topResults.length === 0 ? (
@@ -127,7 +154,7 @@ export default function SearchPage() {
               </div>
             )}
 
-            {tab === 'novels' && (
+            {!searching && tab === 'novels' && (
               <div className="grid grid-cols-3 gap-3">
                 {novelResults.map(novel => (
                   <NovelCard key={novel.id} novel={novel} />
@@ -138,14 +165,14 @@ export default function SearchPage() {
               </div>
             )}
 
-            {tab === 'authors' && (
+            {!searching && tab === 'authors' && (
               <div className="space-y-3">
                 {authorResults.map(novel => (
                   <div key={novel.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white dark:hover:bg-[#1e1e32] transition-colors cursor-pointer">
                     <img src={novel.cover} alt={novel.penName} className="w-12 h-12 rounded-full object-cover" />
                     <div>
                       <p className="font-semibold text-gray-900 dark:text-white text-sm">{novel.penName}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{NOVELS.filter(n => n.penName === novel.penName).length} novel(s)</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{results.filter(n => n.penName === novel.penName).length} novel(s)</p>
                     </div>
                   </div>
                 ))}
@@ -155,7 +182,7 @@ export default function SearchPage() {
               </div>
             )}
 
-            {tab === 'genres' && (
+            {!searching && tab === 'genres' && (
               <div className="grid grid-cols-2 gap-3">
                 {genreResults.map(genre => (
                   <button key={genre.id} onClick={() => navigate(`/genres/${genre.id}`)}

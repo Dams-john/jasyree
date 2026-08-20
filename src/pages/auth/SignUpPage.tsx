@@ -22,13 +22,13 @@ export default function SignUpPage() {
     if (!name || !email || !password || !confirm) { setError('Please fill in all fields.'); return; }
     if (password !== confirm) { setError('Passwords do not match.'); return; }
     if (!agree) { setError('Please agree to the Terms of Service and Privacy Policy.'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     setLoading(true);
     setError('');
-    const ok = await signup(name, email, password);
+    const result = await signup(name, email, password);
     setLoading(false);
-    if (ok) navigate('/email-verification');
-    else setError('Something went wrong. Please try again.');
+    if (result.ok) navigate('/email-verification', { state: { email } });
+    else setError(result.error || 'Something went wrong. Please try again.');
   };
 
   return (

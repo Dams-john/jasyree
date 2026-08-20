@@ -19,10 +19,10 @@ export default function LoginPage() {
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     setLoading(true);
     setError('');
-    const ok = await login(email, password);
+    const result = await login(email, password);
     setLoading(false);
-    if (ok) navigate('/');
-    else setError('Invalid email or password.');
+    if (result.ok) navigate('/');
+    else setError(result.error || 'Invalid email or password.');
   };
 
   return (

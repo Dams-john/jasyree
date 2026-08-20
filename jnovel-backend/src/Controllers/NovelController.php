@@ -95,6 +95,46 @@ class NovelController
         Response::success($result);
     }
 
+    /** GET /api/chapters/{id} — full chapter incl. content, for the reader */
+    public function chapterContent(string $id): void
+    {
+        $userId = AuthMiddleware::optionalUserId();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare("
+            SELECT id, novel_translation_id, number, title, content, published_at, is_premium, coin_cost
+            FROM chapters
+            WHERE id = ? AND publish_status = 'published' AND published_at <= NOW()
+        ");
+        $stmt->execute([$id]);
+        $chapter = $stmt->fetch();
+
+        if (!$chapter) {
+            Response::error('Chapter not found.', 404);
+        }
+
+        $isUnlocked = !$chapter['is_premium'];
+        if (!$isUnlocked && $userId) {
+            $unlockStmt = $pdo->prepare("SELECT 1 FROM chapter_unlocks WHERE user_id = ? AND chapter_id = ?");
+            $unlockStmt->execute([$userId, $chapter['id']]);
+            $isUnlocked = (bool) $unlockStmt->fetch();
+        }
+
+        if (!$isUnlocked) {
+            Response::error('This chapter is locked.', 403, ['isPremium' => true, 'coinCost' => (int) $chapter['coin_cost']]);
+        }
+
+        Response::success([
+            'id' => (int) $chapter['id'],
+            'novelTranslationId' => (int) $chapter['novel_translation_id'],
+            'number' => (int) $chapter['number'],
+            'title' => $chapter['title'],
+            'content' => $chapter['content'],
+            'publishedAt' => $chapter['published_at'],
+            'isPremium' => (bool) $chapter['is_premium'],
+        ]);
+    }
+
     private function resolveTranslationId(string $identifier): ?int
     {
         $pdo = Database::connection();

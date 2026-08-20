@@ -1,18 +1,78 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { GENRES } from '../data/genres';
-import { NOVELS } from '../data/novels';
+import { Genre } from '../data/genres';
+import { Novel } from '../data/novels';
 import NovelCard from '../components/ui/NovelCard';
 import { useLanguage } from '../contexts/LanguageContext';
+import { genreApi } from '../lib/resources';
+import { ApiError } from '../lib/api';
 
 export default function GenresPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const { t } = useLanguage();
 
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [genreNovels, setGenreNovels] = useState<Record<number, Novel[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    genreApi.list()
+      .then(res => { if (!cancelled) setGenres(res); })
+      .catch(err => { if (!cancelled) setError(err instanceof ApiError ? err.message : 'Failed to load genres.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const genre = id ? genres.find(g => g.id === Number(id)) : undefined;
+
+  useEffect(() => {
+    if (!id || !genre) return;
+    let cancelled = false;
+    genreApi.novelsByGenre(genre.slug ?? String(genre.id))
+      .then(res => { if (!cancelled) setGenreNovels(prev => ({ ...prev, [genre.id]: res.items })); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, genre?.id]);
+
+  // For the overview page's "Featured by Genre" sections
+  useEffect(() => {
+    if (id || genres.length === 0) return;
+    let cancelled = false;
+    Promise.all(genres.slice(0, 3).map(g =>
+      genreApi.novelsByGenre(g.slug ?? String(g.id), 1, 5)
+        .then((res): [number, Novel[]] => [g.id, res.items])
+        .catch((): [number, Novel[]] => [g.id, []])
+    )).then(results => {
+      if (cancelled) return;
+      setGenreNovels(prev => {
+        const next = { ...prev };
+        for (const [gid, items] of results) next[gid] = items;
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, genres.length]);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 flex items-center justify-center">
+        <span className="w-8 h-8 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="max-w-4xl mx-auto px-4 py-12 text-center text-gray-500 dark:text-gray-400">{error}</div>;
+  }
+
   if (id) {
-    const genre = GENRES.find(g => g.id === Number(id));
-    const genreNovels = NOVELS.filter(n => n.genres.some(g => g === genre?.name));
+    const novels: Novel[] = genreNovels[Number(id)] ?? [];
 
     return (
       <div className="max-w-4xl mx-auto pb-8">
@@ -38,7 +98,9 @@ export default function GenresPage() {
         </div>
 
         <div className="px-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {(genreNovels.length > 0 ? genreNovels : NOVELS).map(novel => (
+          {novels.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">No novels found in this genre yet.</div>
+          ) : novels.map(novel => (
             <NovelCard key={novel.id} novel={novel} />
           ))}
         </div>
@@ -51,7 +113,7 @@ export default function GenresPage() {
       <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6">{t.genres}</h1>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-8">
-        {GENRES.map(genre => (
+        {genres.map(genre => (
           <button key={genre.id} onClick={() => navigate(`/genres/${genre.id}`)}
             className="relative overflow-hidden rounded-2xl aspect-video flex items-end p-3 group hover:scale-[1.02] transition-transform">
             <img src={genre.cover} alt={genre.name} className="absolute inset-0 w-full h-full object-cover" />
@@ -69,9 +131,9 @@ export default function GenresPage() {
 
       {/* Featured by Genre */}
       <div className="space-y-8">
-        {GENRES.slice(0, 3).map(genre => {
-          const genreNovels = NOVELS.filter(n => n.genres.includes(genre.name));
-          if (genreNovels.length === 0) return null;
+        {genres.slice(0, 3).map(genre => {
+          const novels = genreNovels[genre.id] ?? [];
+          if (novels.length === 0) return null;
           return (
             <section key={genre.id}>
               <div className="flex items-center justify-between mb-3">
@@ -84,7 +146,7 @@ export default function GenresPage() {
                 </button>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {genreNovels.slice(0, 5).map(novel => (
+                {novels.slice(0, 5).map(novel => (
                   <NovelCard key={novel.id} novel={novel} />
                 ))}
               </div>

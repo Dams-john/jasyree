@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Edit2, BookOpen, Users, Heart, Clock, Settings, LogOut, ShieldCheck, Coins, HelpCircle } from 'lucide-react';
+import { Edit2, BookOpen, Clock, Settings, LogOut, ShieldCheck, Coins, HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { NOVELS } from '../data/novels';
+import { userApi } from '../lib/resources';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'reading' | 'history'>('reading');
+  const [recentlyRead, setRecentlyRead] = useState<{ novelId: number; novelTitle: string; cover: string }[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    userApi.readingHistory(1, 5)
+      .then(res => setRecentlyRead(res.items.map(h => ({ novelId: h.novelId, novelTitle: h.novelTitle, cover: h.cover }))))
+      .catch(() => {});
+  }, [user]);
 
   if (!user) {
     return (
@@ -94,16 +101,18 @@ export default function ProfilePage() {
         </div>
 
         {/* Recently Read */}
-        <div>
-          <h2 className="font-bold text-gray-900 dark:text-white mb-3">Recently Read</h2>
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-            {NOVELS.slice(0, 5).map(novel => (
-              <Link key={novel.id} to={`/novel/${novel.id}`} className="shrink-0">
-                <img src={novel.cover} alt={novel.title} className="w-16 h-24 object-cover rounded-lg hover:opacity-80 transition-opacity" />
-              </Link>
-            ))}
+        {recentlyRead.length > 0 && (
+          <div>
+            <h2 className="font-bold text-gray-900 dark:text-white mb-3">Recently Read</h2>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+              {recentlyRead.map(item => (
+                <Link key={item.novelId} to={`/novel/${item.novelId}`} className="shrink-0">
+                  <img src={item.cover} alt={item.novelTitle} className="w-16 h-24 object-cover rounded-lg hover:opacity-80 transition-opacity" />
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Menu */}
         <div className="card overflow-hidden">

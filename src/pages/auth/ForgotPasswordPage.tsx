@@ -1,18 +1,27 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Mail } from 'lucide-react';
+import { authApi } from '../../lib/resources';
+import { ApiError } from '../../lib/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    setSent(true);
+    setError('');
+    try {
+      await authApi.forgotPassword(email);
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,6 +44,12 @@ export default function ForgotPasswordPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">No worries, we'll send you a reset link.</p>
                   </div>
                 </div>
+
+                {error && (
+                  <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -62,9 +77,12 @@ export default function ForgotPasswordPage() {
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                   We sent a password reset link to <span className="font-medium text-gray-700 dark:text-gray-300">{email}</span>
                 </p>
-                <Link to="/reset-password" className="btn-primary block w-full py-3 rounded-xl text-center">
+                <Link to={`/reset-password?email=${encodeURIComponent(email)}`} className="btn-primary block w-full py-3 rounded-xl text-center">
                   Continue to Reset Password
                 </Link>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+                  (Mail isn't configured in this dev environment — check the backend's error log for the reset link, or paste the token manually on the next screen.)
+                </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
                   Didn't receive?{' '}
                   <button onClick={() => setSent(false)} className="text-[#e91e8c] font-semibold hover:text-[#c41578]">Resend</button>

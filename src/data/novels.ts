@@ -1,17 +1,20 @@
 export interface Chapter {
   id: number;
-  novelId: number;
+  novelId?: number;
+  novelTranslationId?: number;
   number: number;
   title: string;
   publishedAt: string;
   wordCount: number;
   isPremium: boolean;
   isRead: boolean;
+  isUnlocked?: boolean;
   coinCost: number;
 }
 
 export interface Novel {
   id: number;
+  translationId?: number;
   title: string;
   penName: string;
   cover: string;
@@ -192,7 +195,7 @@ export const NOVELS: Novel[] = [
     views: '340K',
     chapters: 55,
     language: 'en',
-    updatedAt:  '2026-07-22'',
+    updatedAt: '2026-07-22',
     progress: 100,
   },
   {

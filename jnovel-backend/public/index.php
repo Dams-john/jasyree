@@ -73,6 +73,7 @@ $routes = [
     ['GET', '/api/search', [NovelController::class, 'search']],
     ['GET', '/api/novels/{id}', [NovelController::class, 'show']],
     ['GET', '/api/novels/{id}/chapters', [NovelController::class, 'chapters']],
+    ['GET', '/api/chapters/{id}', [NovelController::class, 'chapterContent']],
 
     ['POST', '/api/auth/register', [AuthController::class, 'register']],
     ['POST', '/api/auth/login', [AuthController::class, 'login']],

@@ -1,6 +1,7 @@
 export interface Genre {
   id: number;
   name: string;
+  slug?: string;
   icon: string;
   count: number;
   color: string;

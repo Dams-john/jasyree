@@ -13,10 +13,10 @@ class GenreController
         $pdo = Database::connection();
         $stmt = $pdo->prepare("
             SELECT g.id, g.name, g.slug, g.icon, g.color, g.cover,
-                   COUNT(ng.novel_id) AS novel_count
+                   COUNT(DISTINCT CASE WHEN nt.id IS NOT NULL THEN ng.novel_id END) AS novel_count
             FROM genres g
             LEFT JOIN novel_genres ng ON ng.genre_id = g.id
-            LEFT JOIN novels n ON n.id = ng.novel_id AND n.publish_status = 'published'
+            LEFT JOIN novel_translations nt ON nt.novel_id = ng.novel_id AND nt.publish_status = 'published'
             GROUP BY g.id
             ORDER BY g.name ASC
         ");
@@ -24,6 +24,7 @@ class GenreController
         $genres = array_map(fn($row) => [
             'id' => (int) $row['id'],
             'name' => $row['name'],
+            'slug' => $row['slug'],
             'icon' => $row['icon'],
             'count' => (int) $row['novel_count'],
             'color' => $row['color'],

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart2, BookOpen, Users, Tag, PenTool, Megaphone, Gift, Settings, ChevronLeft, Menu, X, Home, TrendingUp } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { BarChart2, BookOpen, Users, Tag, PenTool, Megaphone, Gift, Settings, Menu, X, Home, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const ADMIN_NAV = [
@@ -19,8 +19,20 @@ const ADMIN_NAV = [
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0f0f1a]">
+        <span className="w-8 h-8 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user || !isAdmin) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f1a] flex">
