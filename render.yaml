@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: jasyree-api
+    runtime: docker
+    rootDir: jnovel-backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: FRONTEND_URL
+        value: https://jasyre.com,https://www.jasyre.com,http://localhost:5173
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASS
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: "900"
+      - key: JWT_REFRESH_TTL
+        value: "2592000"
+      - key: JWT_ISSUER
+        value: jnovel-api
