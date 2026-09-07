@@ -71,6 +71,23 @@ $routes = [
     ['GET', '/api/health', static function (): void {
         Response::success(['status' => 'ok']);
     }],
+    ['GET', '/api/health/db', static function (): void {
+        try {
+            $pdo = Database::connection();
+            $pdo->query('SELECT 1');
+            $tableCheck = $pdo->prepare(
+                'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?'
+            );
+            $tableCheck->execute(['banners']);
+            Response::success([
+                'connection' => 'ok',
+                'schema' => ((int) $tableCheck->fetchColumn() === 1) ? 'ready' : 'missing',
+            ]);
+        } catch (Throwable $e) {
+            error_log('Database health check failed: ' . $e->getMessage());
+            Response::error('Database check failed', 500);
+        }
+    }],
     ['GET', '/api/home', [HomeController::class, 'index']],
     ['GET', '/api/home/featured', [HomeController::class, 'featured']],
     ['GET', '/api/home/latest', [HomeController::class, 'latestUpdates']],
