@@ -57,6 +57,9 @@ $uri = rtrim($uri, '/') ?: '/';
  * Patterns use {param} placeholders, matched via regex.
  */
 $routes = [
+    ['GET', '/api/health', static function (): void {
+        Response::success(['status' => 'ok']);
+    }],
     ['GET', '/api/home', [HomeController::class, 'index']],
     ['GET', '/api/home/featured', [HomeController::class, 'featured']],
     ['GET', '/api/home/latest', [HomeController::class, 'latestUpdates']],
@@ -127,9 +130,13 @@ foreach ($routes as [$routeMethod, $pattern, $handler]) {
     $regex = '#^' . preg_replace('/\{[a-zA-Z_]+\}/', '([^/]+)', $pattern) . '$#';
     if (preg_match($regex, $uri, $matches)) {
         array_shift($matches); // drop full match
-        [$controllerClass, $methodName] = $handler;
-        $controller = new $controllerClass();
-        $controller->$methodName(...$matches);
+        if (is_callable($handler)) {
+            $handler();
+        } else {
+            [$controllerClass, $methodName] = $handler;
+            $controller = new $controllerClass();
+            $controller->$methodName(...$matches);
+        }
         exit;
     }
 }
