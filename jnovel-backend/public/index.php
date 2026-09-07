@@ -10,6 +10,10 @@ $allowedOrigins = array_filter(array_map(
     static fn(string $origin): string => rtrim(trim($origin), '/'),
     explode(',', $config['app']['frontend_url'])
 ));
+$allowedOrigins = array_unique(array_merge($allowedOrigins, [
+    'https://jasyre.com',
+    'https://www.jasyre.com',
+]));
 if ($requestOrigin !== '' && in_array(rtrim($requestOrigin, '/'), $allowedOrigins, true)) {
     header("Access-Control-Allow-Origin: $requestOrigin");
     header('Vary: Origin');
