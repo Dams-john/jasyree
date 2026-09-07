@@ -5,8 +5,15 @@ declare(strict_types=1);
 // ---- CORS ----
 require_once __DIR__ . '/../config/config.php';
 $config = appConfig();
-$allowedOrigin = $config['app']['frontend_url'];
-header("Access-Control-Allow-Origin: $allowedOrigin");
+$requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOrigins = array_filter(array_map(
+    static fn(string $origin): string => rtrim(trim($origin), '/'),
+    explode(',', $config['app']['frontend_url'])
+));
+if ($requestOrigin !== '' && in_array(rtrim($requestOrigin, '/'), $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: $requestOrigin");
+    header('Vary: Origin');
+}
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Allow-Credentials: true');
