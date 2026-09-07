@@ -1,4 +1,4 @@
-const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api';
+const API_URL = (import.meta.env.VITE_API_URL as string) || 'https://jasyree-1.onrender.com/api';
 
 const ACCESS_KEY = 'jasyre_access_token';
 const REFRESH_KEY = 'jasyre_refresh_token';
