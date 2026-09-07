@@ -54,11 +54,11 @@ if (!function_exists('appConfig')) {
                 'frontend_url' => env('FRONTEND_URL', 'https://jasyre.com,https://www.jasyre.com,http://localhost:5173'),
             ],
             'db' => [
-                'host' => env('DB_HOST', '127.0.0.1'),
-                'port' => env('DB_PORT', '3306'),
-                'name' => env('DB_NAME', 'jnovel'),
-                'user' => env('DB_USER', 'root'),
-                'pass' => env('DB_PASS', ''),
+                'host' => env('DB_HOST', env('MYSQLHOST', '127.0.0.1')),
+                'port' => env('DB_PORT', env('MYSQLPORT', '3306')),
+                'name' => env('DB_NAME', env('MYSQLDATABASE', 'jnovel')),
+                'user' => env('DB_USER', env('MYSQLUSER', 'root')),
+                'pass' => env('DB_PASS', env('MYSQLPASSWORD', '')),
             ],
             'jwt' => [
                 'secret' => env('JWT_SECRET', 'change-this-secret-in-env'),
