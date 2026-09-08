@@ -11,7 +11,7 @@ services:
       - key: APP_DEBUG
         value: "false"
       - key: FRONTEND_URL
-        value: https://jasyre.com,https://www.jasyre.com,http://localhost:5173
+        value: https://jasyre.com,https://www.jasyre.com
       - key: DB_HOST
         sync: false
       - key: DB_PORT

@@ -1,6 +1,5 @@
 <?php
 
-
 if (!function_exists('loadEnv')) {
     function loadEnv(string $path): void
     {
@@ -32,7 +31,10 @@ if (!function_exists('loadEnv')) {
 if (!function_exists('env')) {
     function env(string $key, $default = null)
     {
-        return $_ENV[$key] ?? getenv($key) ?: $default;
+        $value = $_ENV[$key] ?? getenv($key);
+        return $value !== false && $value !== null && trim((string) $value) !== ''
+            ? $value
+            : $default;
     }
 }
 
@@ -46,6 +48,21 @@ if (!function_exists('appConfig')) {
 
         loadEnv(__DIR__ . '/../.env');
 
+        // Parse connection URL if provided (e.g., DATABASE_URL or MYSQL_URL)
+        $dbUrl = env('DATABASE_URL', env('MYSQL_URL'));
+        $urlHost = null; $urlPort = null; $urlUser = null; $urlPass = null; $urlName = null;
+
+        if ($dbUrl) {
+            $parsedUrl = parse_url($dbUrl);
+            if ($parsedUrl) {
+                $urlHost = $parsedUrl['host'] ?? null;
+                $urlPort = isset($parsedUrl['port']) ? (string)$parsedUrl['port'] : null;
+                $urlUser = $parsedUrl['user'] ?? null;
+                $urlPass = isset($parsedUrl['pass']) ? rawurldecode($parsedUrl['pass']) : null;
+                $urlName = isset($parsedUrl['path']) ? ltrim($parsedUrl['path'], '/') : null;
+            }
+        }
+
         $config = [
             'app' => [
                 'env' => env('APP_ENV', 'production'),
@@ -54,11 +71,11 @@ if (!function_exists('appConfig')) {
                 'frontend_url' => env('FRONTEND_URL', 'https://jasyre.com,https://www.jasyre.com,http://localhost:5173'),
             ],
             'db' => [
-                'host' => env('DB_HOST', env('MYSQLHOST', '127.0.0.1')),
-                'port' => env('DB_PORT', env('MYSQLPORT', '3306')),
-                'name' => env('DB_NAME', env('MYSQLDATABASE', 'jnovel')),
-                'user' => env('DB_USER', env('MYSQLUSER', 'root')),
-                'pass' => env('DB_PASS', env('MYSQLPASSWORD', '')),
+                'host' => env('DB_HOST', $urlHost ?? env('MYSQLHOST', '31.70.138.125')),
+                'port' => env('DB_PORT', $urlPort ?? env('MYSQLPORT', '3306')),
+                'name' => env('DB_NAME', $urlName ?? env('MYSQLDATABASE', 'my_app_db')),
+                'user' => env('DB_USER', $urlUser ?? env('MYSQLUSER', 'render_user')),
+                'pass' => env('DB_PASS', $urlPass ?? env('MYSQLPASSWORD', 'jasyre@123')),
             ],
             'jwt' => [
                 'secret' => env('JWT_SECRET', 'change-this-secret-in-env'),
