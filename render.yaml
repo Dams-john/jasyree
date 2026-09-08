@@ -13,15 +13,15 @@ services:
       - key: FRONTEND_URL
         value: https://jasyre.com,https://www.jasyre.com
       - key: DB_HOST
-        sync: false
+        value: 31.70.138.125
       - key: DB_PORT
-        sync: false
+        value: "3306"
       - key: DB_NAME
-        value: railway
+        value: my_app_db
       - key: DB_USER
-        value: root
+        value: render_user
       - key: DB_PASS
-        sync: false
+        value: jasyre@123
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_ACCESS_TTL
