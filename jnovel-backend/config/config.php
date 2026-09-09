@@ -71,11 +71,11 @@ if (!function_exists('appConfig')) {
                 'frontend_url' => env('FRONTEND_URL', 'https://jasyre.com,https://www.jasyre.com,http://localhost:5173'),
             ],
             'db' => [
-                'host' => env('DB_HOST', $urlHost ?? env('MYSQLHOST', '31.70.138.125')),
+                'host' => env('DB_HOST', $urlHost ?? env('MYSQLHOST', '127.0.0.1')),
                 'port' => env('DB_PORT', $urlPort ?? env('MYSQLPORT', '3306')),
-                'name' => env('DB_NAME', $urlName ?? env('MYSQLDATABASE', 'my_app_db')),
-                'user' => env('DB_USER', $urlUser ?? env('MYSQLUSER', 'render_user')),
-                'pass' => env('DB_PASS', $urlPass ?? env('MYSQLPASSWORD', 'jasyre@123')),
+                'name' => env('DB_NAME', $urlName ?? env('MYSQLDATABASE', 'jnovel')),
+                'user' => env('DB_USER', $urlUser ?? env('MYSQLUSER', 'root')),
+                'pass' => env('DB_PASS', $urlPass ?? env('MYSQLPASSWORD', '')),
             ],
             'jwt' => [
                 'secret' => env('JWT_SECRET', 'change-this-secret-in-env'),
