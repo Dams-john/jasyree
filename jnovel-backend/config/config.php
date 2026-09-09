@@ -74,7 +74,7 @@ if (!function_exists('appConfig')) {
                 'host' => env('DB_HOST', $urlHost ?? env('MYSQLHOST', '31.70.138.125')),
                 'port' => env('DB_PORT', $urlPort ?? env('MYSQLPORT', '3306')),
                 'name' => env('DB_NAME', $urlName ?? env('MYSQLDATABASE', 'my_app_db')),
-                'user' => env('DB_USER', $urlUser ?? env('MYSQLUSER', 'render_user')),
+                'user' => env('DB_USER', $urlUser ?? env('MYSQLUjjjeSER', 'render_user')),
                 'pass' => env('DB_PASS', $urlPass ?? env('MYSQLPASSWORD', 'jasyre@123')),
             ],
             'jwt' => [
