@@ -26,9 +26,10 @@ class Database
                     PDO::ATTR_EMULATE_PREPARES => false,
                 ]);
             }catch (PDOException $e) {
-    die("DB ERROR: " . $e->getMessage());
-}
-        }
+                error_log('DB connection failed: ' . $e->getMessage());
+                Response::error('Database connection failed', 500);
+                exit;
+            }
 
         return self::$instance;
     }
