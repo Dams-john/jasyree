@@ -1,13 +1,13 @@
 {
   "functions": {
-    "jnovel-backend/*/.php": {
+    "api/**/*.php": {
       "runtime": "vercel-php@0.6.0"
     }
   },
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "/jnovel-backend/$1"
+      "src": "/jnovel-backend/(.*)",
+      "dest": "/api/jnovel-backend/$1"
     }
   ]
 }
