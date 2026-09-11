@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "jnovel-backend": {
+      "root": "jnovel-backend",
+      "entrypoint": "Dockerfile",
+      "runtime": "container"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "jnovel-backend",
+        "path": "/$1"
+      }
+    }
+  ]
+}
