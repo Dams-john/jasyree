@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../Middleware/AuthMiddleware.php';
+require_once __DIR__ . '/../Models/Notification.php';
 require_once __DIR__ . '/../Utils/Response.php';
 require_once __DIR__ . '/../Utils/Validator.php';
 require_once __DIR__ . '/../../config/database.php';
@@ -290,6 +291,13 @@ class AdminController
 
         $this->recalcChaptersCount((int) $translation['id']);
 
+        // NEW: only notify if this chapter is live right now — a future-scheduled chapter
+        // notifies once it's actually published, not at creation time.
+        $isLiveNow = $publishStatus === 'published' && $publishedAt && strtotime($publishedAt) <= time();
+        if ($isLiveNow) {
+            $this->notifyNewChapter((int) $translation['id'], $data['number'], $data['title']);
+        }
+
         Response::success(['chapterId' => $chapterId], 'Chapter created.', 201);
     }
 
@@ -340,6 +348,19 @@ class AdminController
         $stmt = $pdo->prepare("UPDATE chapters SET " . implode(', ', $fields) . " WHERE id = ?");
         $stmt->execute($params);
 
+        // NEW: notify only on the transition from "not visible yet" to "live now" — never on
+        // routine edits to an already-published chapter, and never twice for the same chapter.
+        $wasLive = $chapter['publish_status'] === 'published'
+            && $chapter['published_at'] && strtotime($chapter['published_at']) <= time();
+
+        $newPublishStatus = $data['publishStatus'] ?? $chapter['publish_status'];
+        $newPublishedAt = array_key_exists('publishedAt', $data) ? $data['publishedAt'] : $chapter['published_at'];
+        $isLiveNow = $newPublishStatus === 'published' && $newPublishedAt && strtotime($newPublishedAt) <= time();
+
+        if ($isLiveNow && !$wasLive) {
+            $this->notifyNewChapter((int) $chapter['novel_translation_id'], $chapter['number'], $data['title'] ?? $chapter['title']);
+        }
+
         $this->recalcChaptersCount((int) $chapter['novel_translation_id']);
 
         Response::success(null, 'Chapter updated.');
@@ -361,8 +382,247 @@ class AdminController
     }
 
     // ============================================================
+    // NEW: GENRES
+    // ============================================================
+
+    /** POST /api/admin/genres — admin only (genres are shared platform-wide taxonomy) */
+    public function createGenre(): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+
+        (new Validator($data))
+            ->required('name', 'Genre name')
+            ->maxLength('name', 60)
+            ->validate();
+
+        $pdo = Database::connection();
+        $nameCheckStmt = $pdo->prepare("SELECT id FROM genres WHERE name = ?");
+        $nameCheckStmt->execute([trim($data['name'])]);
+        if ($nameCheckStmt->fetch()) {
+            Response::error('A genre with this name already exists.', 409);
+        }
+
+        $slug = $this->uniqueSlug('genres', $this->slugify($data['name']));
+
+        $stmt = $pdo->prepare("INSERT INTO genres (name, slug, icon, color, cover) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([
+            trim($data['name']),
+            $slug,
+            $data['icon'] ?? null,
+            $data['color'] ?? null,
+            $data['cover'] ?? null,
+        ]);
+
+        Response::success([
+            'id' => (int) $pdo->lastInsertId(),
+            'name' => trim($data['name']),
+            'slug' => $slug,
+        ], 'Genre created.', 201);
+    }
+
+    // ============================================================
+    // NEW: DASHBOARD STATISTICS
+    // ============================================================
+
+    /** GET /api/admin/stats — admin only (platform-wide figures) */
+    public function stats(): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $pdo = Database::connection();
+
+        $totalUsers = (int) $pdo->query("SELECT COUNT(*) AS c FROM users")->fetch()['c'];
+        $totalNovels = (int) $pdo->query("SELECT COUNT(*) AS c FROM novels")->fetch()['c'];
+        $totalChapters = (int) $pdo->query("SELECT COUNT(*) AS c FROM chapters")->fetch()['c'];
+        $publishedChapters = (int) $pdo->query("
+            SELECT COUNT(*) AS c FROM chapters WHERE publish_status = 'published' AND published_at <= NOW()
+        ")->fetch()['c'];
+        $totalReads = (int) $pdo->query("SELECT COUNT(*) AS c FROM chapter_reads")->fetch()['c'];
+
+        // Revenue figures — these tables exist and are ready, but will read 0 until
+        // a payment provider is actually integrated and starts writing real transactions.
+        $revenueRow = $pdo->query("
+            SELECT COALESCE(SUM(amount), 0) AS total FROM payment_transactions WHERE status = 'successful'
+        ")->fetch();
+        $coinSalesRow = $pdo->query("
+            SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+            FROM payment_transactions WHERE type = 'coin_package' AND status = 'successful'
+        ")->fetch();
+        $subscriptionSalesRow = $pdo->query("
+            SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+            FROM payment_transactions WHERE type = 'subscription' AND status = 'successful'
+        ")->fetch();
+
+        Response::success([
+            'totalUsers' => $totalUsers,
+            'totalNovels' => $totalNovels,
+            'totalChapters' => $totalChapters,
+            'publishedChapters' => $publishedChapters,
+            'totalReads' => $totalReads,
+            'revenue' => (float) $revenueRow['total'],
+            'coinSales' => [
+                'total' => (float) $coinSalesRow['total'],
+                'count' => (int) $coinSalesRow['count'],
+            ],
+            'subscriptionSales' => [
+                'total' => (float) $subscriptionSalesRow['total'],
+                'count' => (int) $subscriptionSalesRow['count'],
+            ],
+            // No ads system exists yet (no table, no tracking) — null makes that explicit
+            // rather than misleadingly showing $0 as if ads ran and earned nothing.
+            'advertisementRevenue' => null,
+        ]);
+    }
+
+    // ============================================================
+    // NEW: NOTIFICATIONS (admin-triggered)
+    // ============================================================
+
+    /** POST /api/admin/notifications/broadcast — send a promo notification to many users at once */
+    public function broadcastNotification(): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+
+        (new Validator($data))
+            ->required('title', 'Title')
+            ->required('message', 'Message')
+            ->validate();
+
+        $audience = $data['audience'] ?? 'all';
+        $userIds = match ($audience) {
+            'subscribers' => Notification::getActiveSubscriberIds(),
+            'all' => Notification::getAllUserIds(),
+            default => Response::error('audience must be "all" or "subscribers".', 422),
+        };
+
+        Notification::createBulk($userIds, 'promo', $data['title'], $data['message']);
+
+        Response::success(['recipientCount' => count($userIds)], 'Promotion sent.', 201);
+    }
+
+    /** POST /api/admin/users/{userId}/reward-coins — grant coins to a user, e.g. for an event or apology credit */
+    public function rewardCoins(string $userId): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+
+        (new Validator($data))->required('amount', 'Coin amount')->validate();
+        $amount = (int) $data['amount'];
+        if ($amount <= 0) {
+            Response::error('amount must be a positive number.', 422);
+        }
+
+        $pdo = Database::connection();
+        $userStmt = $pdo->prepare("SELECT id, coins FROM users WHERE id = ?");
+        $userStmt->execute([$userId]);
+        $user = $userStmt->fetch();
+        if (!$user) {
+            Response::error('User not found.', 404);
+        }
+
+        $newBalance = (int) $user['coins'] + $amount;
+        $description = $data['message'] ?? 'Coin reward from JNovel';
+
+        $pdo->beginTransaction();
+        try {
+            $updateStmt = $pdo->prepare("UPDATE users SET coins = ? WHERE id = ?");
+            $updateStmt->execute([$newBalance, $userId]);
+
+            $txStmt = $pdo->prepare("
+                INSERT INTO coin_transactions (user_id, type, description, amount, balance_after, reference_type)
+                VALUES (?, 'reward', ?, ?, ?, 'admin_reward')
+            ");
+            $txStmt->execute([$userId, $description, $amount, $newBalance]);
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        Notification::create(
+            (int) $userId,
+            'reward',
+            'You received a coin reward!',
+            "{$description} — +{$amount} coins added to your wallet."
+        );
+
+        Response::success(['newBalance' => $newBalance], 'Coins granted.');
+    }
+
+    /** POST /api/admin/users/{userId}/subscription — manually grant/update a user's subscription (e.g. comping a beta tester) */
+    public function grantSubscription(string $userId): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+
+        (new Validator($data))->required('planSlug', 'Plan')->required('days', 'Duration in days')->validate();
+
+        $pdo = Database::connection();
+        $userStmt = $pdo->prepare("SELECT id FROM users WHERE id = ?");
+        $userStmt->execute([$userId]);
+        if (!$userStmt->fetch()) {
+            Response::error('User not found.', 404);
+        }
+
+        $planStmt = $pdo->prepare("SELECT id, name FROM subscription_plans WHERE slug = ? AND is_active = 1");
+        $planStmt->execute([$data['planSlug']]);
+        $plan = $planStmt->fetch();
+        if (!$plan) {
+            Response::error('Unknown subscription plan.', 404);
+        }
+
+        // End any currently active subscription before starting the new one.
+        $pdo->prepare("UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE user_id = ? AND status = 'active'")
+            ->execute([$userId]);
+
+        $periodEnd = date('Y-m-d H:i:s', time() + ((int) $data['days'] * 86400));
+        $insertStmt = $pdo->prepare("
+            INSERT INTO user_subscriptions (user_id, plan_id, status, current_period_end)
+            VALUES (?, ?, 'active', ?)
+        ");
+        $insertStmt->execute([$userId, $plan['id'], $periodEnd]);
+
+        Notification::create(
+            (int) $userId,
+            'system',
+            'Your subscription was updated',
+            "You now have {$plan['name']} access until " . date('M j, Y', strtotime($periodEnd)) . "."
+        );
+
+        Response::success(['plan' => $plan['name'], 'expiresAt' => $periodEnd], 'Subscription granted.');
+    }
+
+    // ============================================================
     // Helpers
     // ============================================================
+
+    /** NEW: notifies everyone who favorited/bookmarked a novel that a new chapter just went live. */
+    private function notifyNewChapter(int $translationId, int $chapterNumber, string $chapterTitle): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("
+            SELECT n.id AS novel_id, nt.title AS novel_title
+            FROM novel_translations nt
+            INNER JOIN novels n ON n.id = nt.novel_id
+            WHERE nt.id = ?
+        ");
+        $stmt->execute([$translationId]);
+        $novel = $stmt->fetch();
+        if (!$novel) {
+            return;
+        }
+
+        $userIds = Notification::getInterestedUserIds((int) $novel['novel_id']);
+        Notification::createBulk(
+            $userIds,
+            'chapter',
+            'New chapter released!',
+            "Chapter {$chapterNumber}: \"{$chapterTitle}\" of \"{$novel['novel_title']}\" is now available.",
+            (int) $novel['novel_id']
+        );
+    }
 
     private function insertTranslation(int $novelId, array $data): int
     {

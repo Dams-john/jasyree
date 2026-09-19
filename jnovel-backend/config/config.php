@@ -46,7 +46,7 @@ if (!function_exists('appConfig')) {
             return $config;
         }
 
-        loadEnv(_DIR_ . '/../.env');
+        loadEnv(__DIR__ . '/../.env');
 
         // Parse connection URL if provided (e.g., DATABASE_URL or MYSQL_URL)
         $dbUrl = env('DATABASE_URL', env('MYSQL_URL'));
@@ -75,7 +75,7 @@ if (!function_exists('appConfig')) {
                 'port' => env('DB_PORT', $urlPort ?? env('MYSQLPORT', '3306')),
                 'name' => env('DB_NAME', $urlName ?? env('MYSQLDATABASE', 'my_app_db')),
                 'user' => env('DB_USER', $urlUser ?? env('MYSQLUSER', 'render_user')),
-                'pass' => env('DB_PASS', $urlPass ?? env('MYSQLPASSWORD', 'jasyre@123')),
+                'pass' => env('DB_PASS', $urlPass ?? env('MYSQLPASSWORD', '')),
             ],
             'jwt' => [
                 'secret' => env('JWT_SECRET', 'change-this-secret-in-env'),

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Gift, User, MoreHorizontal } from 'lucide-react';
+import { Home, BookOpen, Gift, User } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function MobileNav() {

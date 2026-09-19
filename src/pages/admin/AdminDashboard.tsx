@@ -1,4 +1,4 @@
-import { ArrowUpRight, Users, BookOpen, DollarSign, Star, TrendingUp, Eye, Crown } from 'lucide-react';
+import { ArrowUpRight, Users, BookOpen, DollarSign, TrendingUp, Eye, Crown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NOVELS } from '../../data/novels';
 import { ADMIN_USERS } from '../../data/users';

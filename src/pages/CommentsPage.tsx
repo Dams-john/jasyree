@@ -3,7 +3,6 @@ import { Heart, MessageCircle, Send } from 'lucide-react';
 import { COMMENTS } from '../data/users';
 import { NOVELS } from '../data/novels';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
 
 type CommentTab = 'novel' | 'chapter';
 

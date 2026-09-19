@@ -3,12 +3,10 @@ import { Sun, Moon, Globe, Bell, Lock, Trash2, HelpCircle, FileText, Shield, Che
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LANGUAGES } from '../data/translations';
-import { useAuth } from '../contexts/AuthContext';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
-  const { user } = useAuth();
   const [notifications, setNotifications] = useState({ newChapters: true, comments: true, promos: false, dailyReward: true });
   const [showLangPicker, setShowLangPicker] = useState(false);
 
@@ -81,17 +79,21 @@ export default function SettingsPage() {
               {group.items.map((item, i) => {
                 const isNotification = 'key' in item;
                 const Icon = item.icon;
+                const onClick = 'onClick' in item ? item.onClick : undefined;
+                const value = 'value' in item ? item.value : undefined;
+                const action = 'action' in item ? item.action : undefined;
+                const showArrow = 'showArrow' in item ? item.showArrow : undefined;
                 return (
                   <div key={item.label}
-                    className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? 'border-t border-gray-100 dark:border-gray-800' : ''} ${item.onClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800' : ''}`}
-                    onClick={item.onClick}>
+                    className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? 'border-t border-gray-100 dark:border-gray-800' : ''} ${onClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800' : ''}`}
+                    onClick={onClick}>
                     <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center shrink-0">
                       <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{item.label}</p>
-                      {!isNotification && item.value && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{item.value}</p>
+                      {!isNotification && value && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{value}</p>
                       )}
                     </div>
                     {isNotification ? (
@@ -99,9 +101,9 @@ export default function SettingsPage() {
                         className={`relative w-11 h-6 rounded-full transition-colors ${notifications[item.key] ? 'bg-[#e91e8c]' : 'bg-gray-200 dark:bg-gray-700'}`}>
                         <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${notifications[item.key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
                       </button>
-                    ) : item.action ? (
-                      item.action
-                    ) : item.showArrow ? (
+                    ) : action ? (
+                      action
+                    ) : showArrow ? (
                       <ChevronRight className="w-4 h-4 text-gray-400" />
                     ) : null}
                   </div>

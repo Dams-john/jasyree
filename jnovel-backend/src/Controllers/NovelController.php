@@ -39,13 +39,14 @@ class NovelController
         Response::success($novel);
     }
 
-    /** GET /api/novels/{translationSlugOrId}/chapters */
+    /** GET /api/novels/{translationSlugOrId}/chapters?lang=en */
     public function chapters(string $idOrSlug): void
     {
         $userId = AuthMiddleware::optionalUserId();
+        $lang = $_GET['lang'] ?? Novel::DEFAULT_LANGUAGE;
         $pdo = Database::connection();
 
-        $translationId = $this->resolveTranslationId($idOrSlug);
+        $translationId = $this->resolveTranslationId($idOrSlug, $lang);
         if (!$translationId) {
             Response::error('Novel not found.', 404);
         }
@@ -135,14 +136,20 @@ class NovelController
         ]);
     }
 
-    private function resolveTranslationId(string $identifier): ?int
+    private function resolveTranslationId(string $identifier, string $lang): ?int
     {
         $pdo = Database::connection();
         $isNumeric = ctype_digit($identifier);
-        $stmt = $pdo->prepare(
-            "SELECT id FROM novel_translations WHERE " . ($isNumeric ? "id = ?" : "slug = ?") . " AND publish_status = 'published'"
-        );
-        $stmt->execute([$identifier]);
+        if ($isNumeric) {
+            $stmt = $pdo->prepare("
+                SELECT nt.id FROM novel_translations nt
+                WHERE nt.novel_id = ? AND nt.language = ? AND nt.publish_status = 'published'
+            ");
+            $stmt->execute([$identifier, $lang]);
+        } else {
+            $stmt = $pdo->prepare("SELECT id FROM novel_translations WHERE slug = ? AND publish_status = 'published'");
+            $stmt->execute([$identifier]);
+        }
         $row = $stmt->fetch();
         return $row ? (int) $row['id'] : null;
     }

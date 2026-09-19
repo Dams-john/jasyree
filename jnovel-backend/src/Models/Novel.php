@@ -50,6 +50,7 @@ class Novel
             'rating' => (float) $row['rating_avg'],
             'reviews' => (int) $row['rating_count'],
             'views' => self::formatCount((int) $row['views_count']),
+            'likes' => (int) ($row['like_count'] ?? 0),
             'chapters' => (int) $row['chapters_count'],
             'language' => $row['language'],
             'updatedAt' => $row['updated_at'],
@@ -59,6 +60,7 @@ class Novel
         if ($userContext) {
             $novel['isBookmarked'] = $userContext['isBookmarked'] ?? false;
             $novel['isFavorite'] = $userContext['isFavorite'] ?? false;
+            $novel['isLiked'] = $userContext['isLiked'] ?? false;
             if (isset($userContext['progress'])) {
                 $novel['progress'] = $userContext['progress'];
             }
@@ -68,6 +70,33 @@ class Novel
         }
 
         return $novel;
+    }
+
+    /** NEW: fetch like counts for a batch of rows (keyed by novel_id). Shown to everyone, logged in or not. */
+    public static function attachLikeCounts(array $rows): array
+    {
+        if (empty($rows)) {
+            return $rows;
+        }
+        $pdo = Database::connection();
+        $novelIds = array_unique(array_column($rows, 'novel_id'));
+        $placeholders = implode(',', array_fill(0, count($novelIds), '?'));
+
+        $stmt = $pdo->prepare("
+            SELECT novel_id, COUNT(*) AS like_count FROM novel_likes
+            WHERE novel_id IN ($placeholders) GROUP BY novel_id
+        ");
+        $stmt->execute($novelIds);
+        $countsByNovel = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $countsByNovel[$r['novel_id']] = (int) $r['like_count'];
+        }
+
+        foreach ($rows as &$row) {
+            $row['like_count'] = $countsByNovel[$row['novel_id']] ?? 0;
+        }
+
+        return $rows;
     }
 
     /** Fetch genres + tags for a batch of rows (keyed by novel_id, not translation_id — genres are shared). */
@@ -112,7 +141,7 @@ class Novel
         return $rows;
     }
 
-    /** Attach per-user bookmark/favorite flags (keyed by novel_id — language-agnostic). */
+    /** Attach per-user bookmark/favorite/like flags (keyed by novel_id — language-agnostic). */
     public static function attachUserContext(array $rows, ?int $userId): array
     {
         if (!$userId || empty($rows)) {
@@ -131,11 +160,16 @@ class Novel
         $favStmt->execute([$userId, ...$novelIds]);
         $favorited = array_column($favStmt->fetchAll(), 'novel_id');
 
+        $likeStmt = $pdo->prepare("SELECT novel_id FROM novel_likes WHERE user_id = ? AND novel_id IN ($placeholders)");
+        $likeStmt->execute([$userId, ...$novelIds]);
+        $liked = array_column($likeStmt->fetchAll(), 'novel_id');
+
         $result = [];
         foreach ($rows as $row) {
             $result[] = [$row, [
                 'isBookmarked' => in_array($row['novel_id'], $bookmarked),
                 'isFavorite' => in_array($row['novel_id'], $favorited),
+                'isLiked' => in_array($row['novel_id'], $liked),
             ]];
         }
         return $result;
@@ -325,10 +359,11 @@ class Novel
         $rows = $stmt->fetchAll();
 
         $rows = self::attachGenresAndTags($rows);
+        $rows = self::attachLikeCounts($rows);
 
         $result = [];
         foreach ($rows as $row) {
-            $novel = self::toApiShape($row, ['isBookmarked' => false, 'isFavorite' => false]);
+            $novel = self::toApiShape($row, ['isBookmarked' => false, 'isFavorite' => false, 'isLiked' => false]);
             $novel['currentChapter'] = (int) $row['current_chapter_number'];
             $novel['progress'] = $row['chapters_count'] > 0
                 ? (int) round(($row['current_chapter_number'] / $row['chapters_count']) * 100)
@@ -339,26 +374,44 @@ class Novel
     }
 
     /** Looks up a novel by its translation slug or translation id, for the language that slug belongs to. */
+    /**
+     * Looks up a novel either by its numeric novel id (language-agnostic — resolves to
+     * whichever translation matches $lang) or by a translation's slug (language-specific,
+     * slug alone determines the language).
+     */
     public static function findBySlugOrId(string $identifier, string $lang, ?int $userId = null): ?array
     {
         $pdo = Database::connection();
         $isNumeric = ctype_digit($identifier);
-        // When numeric, treat it as a translation id directly and ignore the language filter
-        // (a translation id is already language-specific).
         if ($isNumeric) {
-            $stmt = $pdo->prepare(str_replace("WHERE nt.language = ? AND nt.publish_status = 'published'", "WHERE nt.id = ? AND nt.publish_status = 'published'", self::BASE_SELECT));
-            $stmt->execute([$identifier]);
+            $stmt = $pdo->prepare(str_replace(
+                "WHERE nt.language = ? AND nt.publish_status = 'published'",
+                "WHERE n.id = ? AND nt.language = ? AND nt.publish_status = 'published'",
+                self::BASE_SELECT
+            ));
+            $stmt->execute([$identifier, $lang]);
         } else {
-            $stmt = $pdo->prepare(str_replace("WHERE nt.language = ? AND nt.publish_status = 'published'", "WHERE nt.slug = ? AND nt.publish_status = 'published'", self::BASE_SELECT));
+            $stmt = $pdo->prepare(str_replace(
+                "WHERE nt.language = ? AND nt.publish_status = 'published'",
+                "WHERE nt.slug = ? AND nt.publish_status = 'published'",
+                self::BASE_SELECT
+            ));
             $stmt->execute([$identifier]);
         }
         $row = $stmt->fetch();
         if (!$row) {
             return null;
         }
+
+        // NEW: each successful detail lookup counts as a view. Simple fire-and-forget
+        // increment — no dedup/rate-limiting.
+        $pdo->prepare("UPDATE novels SET views_count = views_count + 1 WHERE id = ?")->execute([$row['novel_id']]);
+        $row['views_count'] = (int) $row['views_count'] + 1;
+
         $rows = self::attachGenresAndTags([$row]);
+        $rows = self::attachLikeCounts($rows);
         [$row, $context] = self::attachUserContext($rows, $userId)[0];
-        return self::toApiShape($row, $context ?? ['isBookmarked' => false, 'isFavorite' => false]);
+        return self::toApiShape($row, $context ?? ['isBookmarked' => false, 'isFavorite' => false, 'isLiked' => false]);
     }
 
     /** All published language editions available for a given novel (for a language-switcher UI). */
@@ -378,9 +431,10 @@ class Novel
     private static function hydrate(array $rows, ?int $userId): array
     {
         $rows = self::attachGenresAndTags($rows);
+        $rows = self::attachLikeCounts($rows);
         $withContext = self::attachUserContext($rows, $userId);
         return array_map(
-            fn($pair) => self::toApiShape($pair[0], $pair[1] ?? ['isBookmarked' => false, 'isFavorite' => false]),
+            fn($pair) => self::toApiShape($pair[0], $pair[1] ?? ['isBookmarked' => false, 'isFavorite' => false, 'isLiked' => false]),
             $withContext
         );
     }

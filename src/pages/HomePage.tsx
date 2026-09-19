@@ -12,7 +12,7 @@ import { ApiError } from '../lib/api';
 export default function HomePage() {
   const { t } = useLanguage();
   const [bannerIdx, setBannerIdx] = useState(0);
-  const bannerRef = useRef<NodeJS.Timeout | null>(null);
+  const bannerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

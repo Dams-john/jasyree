@@ -1,16 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
-import { GENRES } from '../../data/genres';
+import { GENRES, Genre } from '../../data/genres';
+import { genreApi } from '../../lib/resources';
 
 export default function AdminGenres() {
   const [showAdd, setShowAdd] = useState(false);
+  const [genres, setGenres] = useState<Genre[]>(GENRES);
+
+  useEffect(() => {
+    genreApi.list()
+      .then(data => { if (data && data.length > 0) setGenres(data); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="max-w-4xl space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white">Genres</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{GENRES.length} genres</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{genres.length} genres</p>
         </div>
         <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm">
           <Plus className="w-4 h-4" />
@@ -19,7 +27,7 @@ export default function AdminGenres() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {GENRES.map(genre => (
+        {genres.map(genre => (
           <div key={genre.id} className="card p-4 flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0" style={{ background: `${genre.color}20` }}>
               {genre.icon}

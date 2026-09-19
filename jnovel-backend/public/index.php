@@ -50,6 +50,7 @@ require_once __DIR__ . '/../src/Controllers/AuthController.php';
 require_once __DIR__ . '/../src/Controllers/UserController.php';
 require_once __DIR__ . '/../src/Controllers/AdminController.php';
 require_once __DIR__ . '/../src/Controllers/PenNameController.php';
+require_once __DIR__ . '/../src/Controllers/CommentController.php';
 
 // ---- Routing ----
 $method = $_SERVER['REQUEST_METHOD'];
@@ -128,13 +129,35 @@ $routes = [
     ['GET', '/api/user/bookmarks', [UserController::class, 'bookmarks']],
     ['POST', '/api/user/bookmarks/{novelId}', [UserController::class, 'addBookmark']],
     ['DELETE', '/api/user/bookmarks/{novelId}', [UserController::class, 'removeBookmark']],
+    // NEW: likes
+    ['GET', '/api/user/likes', [UserController::class, 'likes']],
+    ['POST', '/api/user/likes/{novelId}', [UserController::class, 'addLike']],
+    ['DELETE', '/api/user/likes/{novelId}', [UserController::class, 'removeLike']],
     ['GET', '/api/user/notifications', [UserController::class, 'notifications']],
     ['PATCH', '/api/user/notifications/{id}/read', [UserController::class, 'markNotificationRead']],
     ['PATCH', '/api/user/notifications/read-all', [UserController::class, 'markAllNotificationsRead']],
 
+    // NEW: comments
+    ['GET', '/api/novels/{id}/comments', [CommentController::class, 'index']],
+    ['POST', '/api/novels/{id}/comments', [CommentController::class, 'create']],
+    ['DELETE', '/api/comments/{id}', [CommentController::class, 'delete']],
+    ['POST', '/api/comments/{id}/replies', [CommentController::class, 'reply']],
+    ['DELETE', '/api/comments/replies/{id}', [CommentController::class, 'deleteReply']],
+    ['POST', '/api/comments/{id}/like', [CommentController::class, 'likeComment']],
+    ['DELETE', '/api/comments/{id}/like', [CommentController::class, 'unlikeComment']],
+    ['POST', '/api/comments/replies/{id}/like', [CommentController::class, 'likeReply']],
+    ['DELETE', '/api/comments/replies/{id}/like', [CommentController::class, 'unlikeReply']],
+
     // Admin dashboard — pen names
     ['GET', '/api/admin/pen-names', [PenNameController::class, 'index']],
     ['POST', '/api/admin/pen-names', [PenNameController::class, 'create']],
+
+    // NEW: admin dashboard — genres, stats, notifications
+    ['POST', '/api/admin/genres', [AdminController::class, 'createGenre']],
+    ['GET', '/api/admin/stats', [AdminController::class, 'stats']],
+    ['POST', '/api/admin/notifications/broadcast', [AdminController::class, 'broadcastNotification']],
+    ['POST', '/api/admin/users/{userId}/reward-coins', [AdminController::class, 'rewardCoins']],
+    ['POST', '/api/admin/users/{userId}/subscription', [AdminController::class, 'grantSubscription']],
 
     // Admin dashboard — novels & multi-language editions
     ['GET', '/api/admin/novels', [AdminController::class, 'listNovels']],

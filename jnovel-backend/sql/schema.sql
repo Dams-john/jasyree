@@ -238,6 +238,18 @@ CREATE TABLE favorites (
   UNIQUE KEY uniq_favorite (user_id, novel_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- NEW: a lightweight "like" (heart/thumbs-up), distinct from favorites (personal
+-- collection) and bookmarks (reading list) — the public-facing like count on a novel.
+CREATE TABLE novel_likes (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id     BIGINT UNSIGNED NOT NULL,
+  novel_id    BIGINT UNSIGNED NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (novel_id) REFERENCES novels(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_like (user_id, novel_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- One row per user+translation: tracks "Continue Reading" progress for that language edition.
 CREATE TABLE reading_progress (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

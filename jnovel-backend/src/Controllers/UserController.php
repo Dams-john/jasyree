@@ -142,6 +142,46 @@ class UserController
         Response::success(null, 'Removed from favorites.');
     }
 
+    /** NEW: GET /api/user/likes?lang=en */
+    public function likes(): void
+    {
+        $userId = AuthMiddleware::requireUserId();
+        $lang = $_GET['lang'] ?? Novel::DEFAULT_LANGUAGE;
+
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("SELECT novel_id FROM novel_likes WHERE user_id = ? ORDER BY created_at DESC");
+        $stmt->execute([$userId]);
+        $novelIds = array_column($stmt->fetchAll(), 'novel_id');
+
+        Response::success($this->novelsByIds($novelIds, $lang, $userId));
+    }
+
+    /** NEW: POST /api/user/likes/{novelId} — the lightweight heart/like, separate from favoriting */
+    public function addLike(string $novelId): void
+    {
+        $userId = AuthMiddleware::requireUserId();
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("INSERT IGNORE INTO novel_likes (user_id, novel_id) VALUES (?, ?)");
+        $stmt->execute([$userId, $novelId]);
+
+        $countStmt = $pdo->prepare("SELECT COUNT(*) AS c FROM novel_likes WHERE novel_id = ?");
+        $countStmt->execute([$novelId]);
+        Response::success(['likes' => (int) $countStmt->fetch()['c']], 'Liked.');
+    }
+
+    /** NEW: DELETE /api/user/likes/{novelId} */
+    public function removeLike(string $novelId): void
+    {
+        $userId = AuthMiddleware::requireUserId();
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("DELETE FROM novel_likes WHERE user_id = ? AND novel_id = ?");
+        $stmt->execute([$userId, $novelId]);
+
+        $countStmt = $pdo->prepare("SELECT COUNT(*) AS c FROM novel_likes WHERE novel_id = ?");
+        $countStmt->execute([$novelId]);
+        Response::success(['likes' => (int) $countStmt->fetch()['c']], 'Like removed.');
+    }
+
     /** GET /api/user/bookmarks?lang=en */
     public function bookmarks(): void
     {
@@ -258,6 +298,7 @@ class UserController
         $rows = $stmt->fetchAll();
 
         $rows = Novel::attachGenresAndTags($rows);
+        $rows = Novel::attachLikeCounts($rows);
         $withContext = Novel::attachUserContext($rows, $userId);
 
         // Preserve the original favorite/bookmark order (most recently added first)
