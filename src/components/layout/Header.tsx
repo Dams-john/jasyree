@@ -32,7 +32,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xl font-black text-[#e91e8c] tracking-tight">JASYRE</span>
+          <span className="text-xl font-black text-[#e91e8c] tracking-tight">Dams</span>
         </Link>
 
         {/* Desktop Nav */}
