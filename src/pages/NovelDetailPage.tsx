@@ -5,7 +5,7 @@ import { Novel, Chapter } from '../data/novels';
 import { COMMENTS } from '../data/users';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { novelApi, userApi } from '../lib/resources';
+import { novelApi, userApi, commentApi, CommentItem } from '../lib/resources';
 import { ApiError } from '../lib/api';
 
 type Tab = 'chapters' | 'about' | 'comments';
@@ -25,6 +25,10 @@ export default function NovelDetailPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const [realComments, setRealComments] = useState<CommentItem[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -40,7 +44,32 @@ export default function NovelDetailPage() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const comments = COMMENTS.filter(c => c.novelId === novel?.id);
+  const loadComments = () => {
+    if (!id) return;
+    commentApi.list(id).then(res => setRealComments(res.items)).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (tab === 'comments') loadComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, tab]);
+
+  const handlePostComment = async () => {
+    if (!id || !commentText.trim()) return;
+    if (!isAuthenticated) { navigate('/login'); return; }
+    setPostingComment(true);
+    try {
+      await commentApi.create(id, commentText);
+      setCommentText('');
+      loadComments();
+    } catch {
+      // ignore
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const commentsList = realComments.length > 0 ? realComments : COMMENTS.filter(c => c.novelId === novel?.id);
 
   const toggleBookmark = async () => {
     if (!novel) return;
@@ -277,33 +306,45 @@ export default function NovelDetailPage() {
         {tab === 'comments' && (
           <div>
             <div className="flex gap-3 mb-6">
-              <input type="text" placeholder="Write a comment..." className="input-field flex-1" />
-              <button className="btn-primary px-5 py-2.5 rounded-xl text-sm">Post</button>
+              <input
+                type="text"
+                placeholder="Write a comment..."
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+                className="input-field flex-1"
+              />
+              <button
+                onClick={handlePostComment}
+                disabled={postingComment || !commentText.trim()}
+                className="btn-primary px-5 py-2.5 rounded-xl text-sm disabled:opacity-50"
+              >
+                {postingComment ? 'Posting...' : 'Post'}
+              </button>
             </div>
             <div className="space-y-5">
-              {comments.map(comment => (
+              {commentsList.map(comment => (
                 <div key={comment.id} className="space-y-3">
                   <div className="flex gap-3">
-                    <img src={comment.userAvatar} alt={comment.userName} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                    <img src={comment.userAvatar || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200'} alt={comment.userName} className="w-9 h-9 rounded-full object-cover shrink-0" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">{comment.userName}</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">{comment.time}</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{'createdAt' in comment ? comment.createdAt : comment.time}</span>
                       </div>
                       <p className="text-sm text-gray-600 dark:text-gray-300">{comment.content}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <button className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-[#e91e8c]">
                           ❤️ {comment.likes}
                         </button>
-                        <button className="text-xs text-gray-500 dark:text-gray-400 hover:text-[#e91e8c]">Reply</button>
                       </div>
-                      {comment.replies.map(reply => (
+                      {comment.replies && comment.replies.map(reply => (
                         <div key={reply.id} className="flex gap-3 mt-3 ml-4">
-                          <img src={reply.userAvatar} alt={reply.userName} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                          <img src={reply.userAvatar || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200'} alt={reply.userName} className="w-7 h-7 rounded-full object-cover shrink-0" />
                           <div>
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="text-xs font-semibold text-gray-900 dark:text-white">{reply.userName}</span>
-                              <span className="text-xs text-gray-400">{reply.time}</span>
+                              <span className="text-xs text-gray-400">{'createdAt' in reply ? reply.createdAt : reply.time}</span>
                             </div>
                             <p className="text-xs text-gray-600 dark:text-gray-300">{reply.content}</p>
                           </div>
@@ -313,8 +354,8 @@ export default function NovelDetailPage() {
                   </div>
                 </div>
               ))}
-              {comments.length === 0 && (
-                <p className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">No comments yet.</p>
+              {commentsList.length === 0 && (
+                <p className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">No comments yet. Be the first to comment!</p>
               )}
             </div>
           </div>

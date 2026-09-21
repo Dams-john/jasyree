@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+// ---- Built-in PHP CLI server router support ----
+if (php_sapi_name() === 'cli-server') {
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    if ($path !== '/' && file_exists(__DIR__ . $path) && !is_dir(__DIR__ . $path)) {
+        return false;
+    }
+}
+
 // ---- CORS ----
 require_once __DIR__ . '/../config/config.php';
 $config = appConfig();
@@ -51,6 +59,7 @@ require_once __DIR__ . '/../src/Controllers/UserController.php';
 require_once __DIR__ . '/../src/Controllers/AdminController.php';
 require_once __DIR__ . '/../src/Controllers/PenNameController.php';
 require_once __DIR__ . '/../src/Controllers/CommentController.php';
+require_once __DIR__ . '/../src/Controllers/TagController.php';
 
 // ---- Routing ----
 $method = $_SERVER['REQUEST_METHOD'];
@@ -101,6 +110,7 @@ $routes = [
 
     ['GET', '/api/genres', [GenreController::class, 'index']],
     ['GET', '/api/genres/{slug}/novels', [GenreController::class, 'novelsByGenre']],
+    ['GET', '/api/tags', [TagController::class, 'index']],
 
     ['GET', '/api/search', [NovelController::class, 'search']],
     ['GET', '/api/novels/{id}', [NovelController::class, 'show']],

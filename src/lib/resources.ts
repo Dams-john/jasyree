@@ -96,6 +96,68 @@ export const userApi = {
   markAllNotificationsRead: () => apiFetch<null>('/user/notifications/read-all', { method: 'PATCH' }),
 };
 
+export interface Tag {
+  id: number;
+  name: string;
+  slug: string;
+  count: number;
+}
+
+export const tagApi = {
+  list: () => apiFetch<Tag[]>('/tags'),
+};
+
+export interface CommentItem {
+  id: number;
+  userId: number;
+  userName: string;
+  userAvatar: string | null;
+  content: string;
+  likes: number;
+  isLiked?: boolean;
+  createdAt: string;
+  replies?: ReplyItem[];
+}
+
+export interface ReplyItem {
+  id: number;
+  commentId: number;
+  userId: number;
+  userName: string;
+  userAvatar: string | null;
+  content: string;
+  likes: number;
+  isLiked?: boolean;
+  createdAt: string;
+}
+
+export const commentApi = {
+  list: (novelIdOrSlug: string | number, page = 1, perPage = 20) =>
+    apiFetchPaginated<CommentItem>(`/novels/${novelIdOrSlug}/comments`, { params: { page, per_page: perPage } }),
+  create: (novelIdOrSlug: string | number, content: string, chapterId?: number) =>
+    apiFetch<{ id: number }>(`/novels/${novelIdOrSlug}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content, chapterId }),
+    }),
+  delete: (commentId: number) =>
+    apiFetch<null>(`/comments/${commentId}`, { method: 'DELETE' }),
+  reply: (commentId: number, content: string) =>
+    apiFetch<{ id: number }>(`/comments/${commentId}/replies`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+  deleteReply: (replyId: number) =>
+    apiFetch<null>(`/comments/replies/${replyId}`, { method: 'DELETE' }),
+  likeComment: (commentId: number) =>
+    apiFetch<{ likes: number }>(`/comments/${commentId}/like`, { method: 'POST' }),
+  unlikeComment: (commentId: number) =>
+    apiFetch<{ likes: number }>(`/comments/${commentId}/like`, { method: 'DELETE' }),
+  likeReply: (replyId: number) =>
+    apiFetch<{ likes: number }>(`/comments/replies/${replyId}/like`, { method: 'POST' }),
+  unlikeReply: (replyId: number) =>
+    apiFetch<{ likes: number }>(`/comments/replies/${replyId}/like`, { method: 'DELETE' }),
+};
+
 // ---- Admin (requires author/admin role) ----
 
 export interface AdminNovelListItem {
