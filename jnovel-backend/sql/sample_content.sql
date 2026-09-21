@@ -7,6 +7,19 @@
 INSERT INTO users (name, email, password_hash, role, email_verified_at) VALUES
 ('JNovel Admin', 'admin@jnovel.app', '$2y$10$abcdefghijklmnopqrstuvKPOu5oCzLZ5tZ5tZ5tZ5tZ5tZ5tZ5tO', 'admin', NOW());
 
+INSERT INTO users (name, email, password_hash, role, email_verified_at)
+VALUES (
+  'Jasyre Admin',
+  'info@jasyre.com',
+  '$2y$10$Q669vpIpGe8daFlJ/ZKqGeRBCXDa/acPFgO3iM/BP2QU1DXkORUWS',
+  'admin',
+  NOW()
+)
+ON DUPLICATE KEY UPDATE
+  password_hash = VALUES(password_hash),
+  role = 'admin',
+  email_verified_at = NOW();
+
 SET @admin_id = LAST_INSERT_ID();
 
 INSERT INTO pen_names (user_id, name, slug) VALUES
