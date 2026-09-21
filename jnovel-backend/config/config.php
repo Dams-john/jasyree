@@ -68,6 +68,7 @@ if (!function_exists('appConfig')) {
                 'env' => env('APP_ENV', 'production'),
                 'debug' => env('APP_DEBUG', 'false') === 'true',
                 'url' => env('APP_URL', 'http://localhost'),
+                'frontend_url' => env('FRONTEND_URL', 'https://jasyre.com,https://www.jasyre.com,http://localhost:5173'),
                 'frontend_url' => env('FRONTEND_URL', 'https://jasyre.com,https://www.jasyre.com,http://localhost:5173,http://127.0.0.1:5173'),
             ],
             'db' => [

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Eye, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, TrendingUp, Bell, Send } from 'lucide-react';
+import { adminApi } from '../../lib/resources';
+import { ApiError } from '../../lib/api';
 
 const ADS = [
   { id: 1, name: 'Summer Reading Campaign', type: 'Banner', status: 'active', impressions: 45230, clicks: 1240, ctr: '2.7%' },
@@ -10,18 +12,49 @@ const ADS = [
 
 export default function AdminAds() {
   const [showAdd, setShowAdd] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifMsg, setNotifMsg] = useState('');
+  const [audience, setAudience] = useState<'all' | 'subscribers'>('all');
+  const [sending, setSending] = useState(false);
+  const [resultMsg, setResultMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifTitle.trim() || !notifMsg.trim()) return;
+    setSending(true);
+    setResultMsg('');
+    setErrorMsg('');
+    try {
+      const res = await adminApi.broadcastNotification({ title: notifTitle, message: notifMsg, audience });
+      setResultMsg(`Successfully sent to ${res.recipientCount} user(s).`);
+      setNotifTitle('');
+      setNotifMsg('');
+    } catch (err) {
+      setErrorMsg(err instanceof ApiError ? err.message : 'Failed to send broadcast.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Advertisements</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{ADS.length} campaigns</p>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Advertisements & Promotions</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{ADS.length} campaigns active</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm">
-          <Plus className="w-4 h-4" />
-          New Campaign
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowBroadcast(true)} className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <Bell className="w-4 h-4 text-[#e91e8c]" />
+            Broadcast Notification
+          </button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm">
+            <Plus className="w-4 h-4" />
+            New Campaign
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -103,6 +136,35 @@ export default function AdminAds() {
               <button onClick={() => setShowAdd(false)} className="flex-1 btn-primary py-2.5 rounded-xl text-sm">Create</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showBroadcast && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form onSubmit={handleBroadcast} className="bg-white dark:bg-[#1e1e32] rounded-2xl p-6 w-full max-w-md animate-slide-up">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Broadcast Notification</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Send a promo or announcement push notification to users.</p>
+            {resultMsg && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm">{resultMsg}</div>}
+            {errorMsg && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">{errorMsg}</div>}
+            <div className="space-y-3">
+              <input type="text" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} placeholder="Notification Title" className="input-field" required />
+              <textarea value={notifMsg} onChange={e => setNotifMsg(e.target.value)} placeholder="Message Content" className="input-field h-24 resize-none" required />
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Target Audience</label>
+                <select value={audience} onChange={e => setAudience(e.target.value as 'all' | 'subscribers')} className="input-field">
+                  <option value="all">All Active Users</option>
+                  <option value="subscribers">Subscribers Only</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button type="button" onClick={() => setShowBroadcast(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm">Cancel</button>
+              <button type="submit" disabled={sending} className="flex-1 btn-primary py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                <Send className="w-4 h-4" />
+                {sending ? 'Sending…' : 'Send Push'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

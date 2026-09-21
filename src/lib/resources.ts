@@ -217,4 +217,15 @@ export const adminApi = {
   listPenNames: () => apiFetch<PenName[]>('/admin/pen-names'),
   createPenName: (data: { name: string; bio?: string; avatar?: string }) =>
     apiFetch<{ id: number; name: string; slug: string }>('/admin/pen-names', { method: 'POST', body: JSON.stringify(data) }),
+
+  listTags: () => apiFetch<Tag[]>('/tags'),
+
+  broadcastNotification: (data: { title: string; message: string; audience?: 'all' | 'subscribers' }) =>
+    apiFetch<{ recipientCount: number }>('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) }),
+
+  deleteComment: (commentId: number) =>
+    apiFetch<null>(`/comments/${commentId}`, { method: 'DELETE' }),
+
+  deleteReply: (replyId: number) =>
+    apiFetch<null>(`/comments/replies/${replyId}`, { method: 'DELETE' }),
 };

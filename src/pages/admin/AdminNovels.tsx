@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Eye, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { adminApi, AdminNovelListItem, PenName } from '../../lib/resources';
+import { adminApi, AdminNovelListItem, PenName, Tag } from '../../lib/resources';
 import { ApiError } from '../../lib/api';
 
 export default function AdminNovels() {
@@ -9,6 +9,8 @@ export default function AdminNovels() {
   const [showAdd, setShowAdd] = useState(false);
   const [novels, setNovels] = useState<AdminNovelListItem[]>([]);
   const [penNames, setPenNames] = useState<PenName[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -21,8 +23,8 @@ export default function AdminNovels() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([adminApi.listNovels(), adminApi.listPenNames()])
-      .then(([n, p]) => { setNovels(n); setPenNames(p); })
+    Promise.all([adminApi.listNovels(), adminApi.listPenNames(), adminApi.listTags()])
+      .then(([n, p, t]) => { setNovels(n); setPenNames(p); setAvailableTags(t); })
       .catch(err => setError(err instanceof ApiError ? err.message : 'Failed to load novels.'))
       .finally(() => setLoading(false));
   };
@@ -34,15 +36,26 @@ export default function AdminNovels() {
     n.translations.some(t => t.title.toLowerCase().includes(query.toLowerCase()))
   );
 
+  const toggleTag = (tagId: number) => {
+    setSelectedTagIds(prev => prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]);
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!penNameId) { setFormError('Select a pen name first.'); return; }
     setSubmitting(true);
     setFormError('');
     try {
-      await adminApi.createNovel({ penNameId: Number(penNameId), language: 'en', title, synopsis, status });
+      await adminApi.createNovel({
+        penNameId: Number(penNameId),
+        language: 'en',
+        title,
+        synopsis,
+        status,
+        tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+      });
       setShowAdd(false);
-      setTitle(''); setSynopsis(''); setPenNameId('');
+      setTitle(''); setSynopsis(''); setPenNameId(''); setSelectedTagIds([]);
       load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Failed to create novel.');
@@ -146,6 +159,23 @@ export default function AdminNovels() {
                 <option value="completed">Completed</option>
                 <option value="hiatus">Hiatus</option>
               </select>
+              {availableTags.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Select Tags</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableTags.map(tag => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedTagIds.includes(tag.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}
+                      >
+                        #{tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {penNames.length === 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">You need a pen name first — add one under Pen Names.</p>
               )}
