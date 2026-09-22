@@ -37,6 +37,9 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminAds from './pages/admin/AdminAds';
 import AdminRewards from './pages/admin/AdminRewards';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
+import AdminTags from './pages/admin/AdminTags';
+import AdminComments from './pages/admin/AdminComments';
+import AdminNotifications from './pages/admin/AdminNotifications';
 
 export default function App() {
   return (
@@ -61,6 +64,9 @@ export default function App() {
                 <Route path="novels" element={<AdminNovels />} />
                 <Route path="chapters" element={<AdminChapters />} />
                 <Route path="genres" element={<AdminGenres />} />
+                <Route path="tags" element={<AdminTags />} />
+                <Route path="comments" element={<AdminComments />} />
+                <Route path="notifications" element={<AdminNotifications />} />
                 <Route path="pen-names" element={<AdminPenNames />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="ads" element={<AdminAds />} />

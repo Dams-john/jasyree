@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { BarChart2, BookOpen, Users, Tag, PenTool, Megaphone, Gift, Settings, Menu, X, Home, TrendingUp } from 'lucide-react';
+import { BarChart2, BookOpen, Users, Tag, PenTool, Megaphone, Gift, Settings, Menu, X, Home, TrendingUp, MessageSquare, Bell } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const ADMIN_NAV = [
@@ -8,6 +8,9 @@ const ADMIN_NAV = [
   { icon: BookOpen, label: 'Novels', to: '/admin/novels' },
   { icon: BookOpen, label: 'Chapters', to: '/admin/chapters' },
   { icon: Tag, label: 'Genres', to: '/admin/genres' },
+  { icon: Tag, label: 'Tags', to: '/admin/tags' },
+  { icon: MessageSquare, label: 'Comments', to: '/admin/comments' },
+  { icon: Bell, label: 'Notifications', to: '/admin/notifications' },
   { icon: PenTool, label: 'Pen Names', to: '/admin/pen-names' },
   { icon: Users, label: 'Users', to: '/admin/users' },
   { icon: Megaphone, label: 'Advertisements', to: '/admin/ads' },

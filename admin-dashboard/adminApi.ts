@@ -120,4 +120,13 @@ export const adminApi = {
     api.post<{ newBalance: number }>(`/admin/users/${userId}/reward-coins`, { amount, message }),
   grantSubscription: (userId: number, planSlug: string, days: number) =>
     api.post<{ plan: string; expiresAt: string }>(`/admin/users/${userId}/subscription`, { planSlug, days }),
+
+  // Tags
+  listTags: () => api.get<{ id: number; name: string; slug: string; count: number }[]>('/tags', { skipAuth: true }),
+
+  // Comments Moderation
+  listComments: (novelIdOrSlug: string | number, page = 1, perPage = 20) =>
+    api.get<{ items: any[]; total: number; page: number; totalPages: number }>(`/novels/${novelIdOrSlug}/comments?page=${page}&per_page=${perPage}`),
+  deleteComment: (commentId: number) => api.delete(`/comments/${commentId}`),
+  deleteReply: (replyId: number) => api.delete(`/comments/replies/${replyId}`),
 };

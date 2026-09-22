@@ -223,6 +223,9 @@ export const adminApi = {
   broadcastNotification: (data: { title: string; message: string; audience?: 'all' | 'subscribers' }) =>
     apiFetch<{ recipientCount: number }>('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) }),
 
+  listComments: (novelIdOrSlug: string | number, page = 1, perPage = 20) =>
+    apiFetchPaginated<CommentItem>(`/novels/${novelIdOrSlug}/comments`, { params: { page, per_page: perPage } }),
+
   deleteComment: (commentId: number) =>
     apiFetch<null>(`/comments/${commentId}`, { method: 'DELETE' }),
 
