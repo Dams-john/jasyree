@@ -13,7 +13,6 @@ interface HeaderProps {
 export default function Header({ onMenuToggle }: HeaderProps) {
   const { user, isAuthenticated, logout, isAdmin } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { user, isAuthenticated, logout } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
