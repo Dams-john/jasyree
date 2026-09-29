@@ -126,7 +126,7 @@ class User
             'id' => (int) $row['id'],
             'name' => $row['name'],
             'email' => $row['email'],
-            'avatar' => $row['avatar'] ?: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200',
+            'avatar' => $row['avatar'] ?: null,
             'coins' => (int) $row['coins'],
             'subscription' => $subscription,
             'joinedAt' => date('Y-m-d', strtotime($row['created_at'])),
