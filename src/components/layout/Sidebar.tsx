@@ -11,7 +11,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   const navItems = [
     { icon: Home, label: t.home, to: '/' },
@@ -70,13 +70,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             );
           })}
           <div className="border-t border-gray-100 dark:border-gray-800 mt-2 pt-2">
-            <Link to="/admin" onClick={onClose}
-              className="flex items-center gap-3 px-5 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-              <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                <BarChart2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              </div>
-              Admin Dashboard
-            </Link>
+            {isAdmin && (
+  <Link to="/admin" onClick={onClose}
+    className="flex items-center gap-3 px-5 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+    <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+      <BarChart2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+    </div>
+    Admin Dashboard
+  </Link>
+)}
             <Link to="#" onClick={onClose}
               className="flex items-center gap-3 px-5 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
               <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
