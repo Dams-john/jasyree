@@ -11,6 +11,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuToggle }: HeaderProps) {
+  const { user, isAuthenticated, logout, isAdmin } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
   const { t, language, setLanguage } = useLanguage();
@@ -121,18 +122,24 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                     <p className="text-xs text-amber-500 font-medium mt-0.5 capitalize">{user.subscription} Plan</p>
                   </div>
                   {[
-                    { icon: User, label: t.profile, to: '/profile' },
-                    { icon: BookOpen, label: t.myLibrary, to: '/library' },
-                    { icon: Coins, label: t.wallet, to: '/wallet' },
-                    { icon: BarChart2, label: 'Admin', to: '/admin' },
-                    { icon: Settings, label: t.settings, to: '/settings' },
-                  ].map(item => (
-                    <Link key={item.to} to={item.to} onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <item.icon className="w-4 h-4 text-gray-400" />
-                      {item.label}
-                    </Link>
-                  ))}
+  { icon: User, label: t.profile, to: '/profile' },
+  { icon: BookOpen, label: t.myLibrary, to: '/library' },
+  { icon: Coins, label: t.wallet, to: '/wallet' },
+  { icon: Settings, label: t.settings, to: '/settings' },
+].map(item => (
+  <Link key={item.to} to={item.to} onClick={() => setShowUserMenu(false)}
+    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+    <item.icon className="w-4 h-4 text-gray-400" />
+    {item.label}
+  </Link>
+))}
+{isAdmin && (
+  <Link to="/admin" onClick={() => setShowUserMenu(false)}
+    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+    <BarChart2 className="w-4 h-4 text-gray-400" />
+    Admin
+  </Link>
+)}
                   <div className="border-t border-gray-100 dark:border-gray-700 mt-1">
                     <button onClick={() => { logout(); setShowUserMenu(false); navigate('/login'); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
