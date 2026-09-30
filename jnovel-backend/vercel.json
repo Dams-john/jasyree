@@ -3,7 +3,7 @@
   "services": {
     "jnovel-backend": {
       "root": "jnovel-backend",
-      "entrypoint": "Dockerfile.vercel",
+      "entrypoint": "Dockerfile",
       "runtime": "container"
     }
   },
