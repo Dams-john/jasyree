@@ -23,10 +23,31 @@ export default function AdminNovels() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([adminApi.listNovels(), adminApi.listPenNames(), adminApi.listTags()])
-      .then(([n, p, t]) => { setNovels(n); setPenNames(p); setAvailableTags(t); })
-      .catch(err => setError(err instanceof ApiError ? err.message : 'Failed to load novels.'))
-      .finally(() => setLoading(false));
+    setError('');
+
+    Promise.allSettled([
+      adminApi.listNovels(),
+      adminApi.listPenNames(),
+      adminApi.listTags(),
+    ]).then(([novelsResult, penNamesResult, tagsResult]) => {
+      if (novelsResult.status === 'fulfilled') {
+        setNovels(novelsResult.value);
+      } else {
+        setError(
+          novelsResult.reason instanceof ApiError
+            ? novelsResult.reason.message
+            : 'Failed to load novels.'
+        );
+      }
+
+      if (penNamesResult.status === 'fulfilled') {
+        setPenNames(penNamesResult.value);
+      }
+
+      if (tagsResult.status === 'fulfilled') {
+        setAvailableTags(tagsResult.value);
+      }
+    }).finally(() => setLoading(false));
   };
 
   useEffect(load, []);
@@ -189,4 +210,4 @@ export default function AdminNovels() {
       )}
     </div>
   );
-}
+      }
