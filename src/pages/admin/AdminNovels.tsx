@@ -46,6 +46,7 @@ export default function AdminNovels() {
     .finally(() => setLoading(false));
 };
 
+  useEffect(load, []);
   const filtered = novels.filter(n =>
     !query || n.slug.toLowerCase().includes(query.toLowerCase()) || n.penName.toLowerCase().includes(query.toLowerCase()) ||
     n.translations.some(t => t.title.toLowerCase().includes(query.toLowerCase()))
