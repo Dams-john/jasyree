@@ -22,35 +22,29 @@ export default function AdminNovels() {
   const [formError, setFormError] = useState('');
 
   const load = () => {
-    setLoading(true);
-    setError('');
+  setLoading(true);
+  setError('');
 
-    Promise.allSettled([
-      adminApi.listNovels(),
-      adminApi.listPenNames(),
-      adminApi.listTags(),
-    ]).then(([novelsResult, penNamesResult, tagsResult]) => {
-      if (novelsResult.status === 'fulfilled') {
-        setNovels(novelsResult.value);
-      } else {
-        setError(
-          novelsResult.reason instanceof ApiError
-            ? novelsResult.reason.message
-            : 'Failed to load novels.'
-        );
-      }
+  // will revisit this
+  adminApi.listNovels()
+    .then(setNovels)
+    .catch(err => {
+      setError(err instanceof ApiError ? err.message : 'Failed to load novels.');
+    });
 
-      if (penNamesResult.status === 'fulfilled') {
-        setPenNames(penNamesResult.value);
-      }
+  adminApi.listPenNames()
+    .then(setPenNames)
+    .catch(() => {
+      // non-blocking
+    });
 
-      if (tagsResult.status === 'fulfilled') {
-        setAvailableTags(tagsResult.value);
-      }
-    }).finally(() => setLoading(false));
-  };
-
-  useEffect(load, []);
+  adminApi.listTags()
+    .then(setAvailableTags)
+    .catch(() => {
+      // tags still 404 on live but ignore so the page still works
+    })
+    .finally(() => setLoading(false));
+};
 
   const filtered = novels.filter(n =>
     !query || n.slug.toLowerCase().includes(query.toLowerCase()) || n.penName.toLowerCase().includes(query.toLowerCase()) ||
