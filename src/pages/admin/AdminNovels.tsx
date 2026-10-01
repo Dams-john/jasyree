@@ -22,31 +22,27 @@ export default function AdminNovels() {
   const [formError, setFormError] = useState('');
 
   const load = () => {
-  setLoading(true);
-  setError('');
+    setLoading(true);
+    setError('');
 
-  // will revisit this
-  adminApi.listNovels()
-    .then(setNovels)
-    .catch(err => {
-      setError(err instanceof ApiError ? err.message : 'Failed to load novels.');
-    });
+    Promise.all([
+      adminApi.listNovels().catch(err => {
+        setError(err instanceof ApiError ? err.message : 'Failed to load novels.');
+        return [] as AdminNovelListItem[];
+      }),
+      adminApi.listPenNames().catch(() => [] as PenName[]),
+      adminApi.listTags().catch(() => [] as Tag[]),
+    ]).then(([n, p, t]) => {
+      setNovels(n);
+      setPenNames(p);
+      setAvailableTags(t);
+    }).finally(() => setLoading(false));
+  };
 
-  adminApi.listPenNames()
-    .then(setPenNames)
-    .catch(() => {
-      // non-blocking
-    });
+  useEffect(() => {
+    load();
+  }, []);
 
-  adminApi.listTags()
-    .then(setAvailableTags)
-    .catch(() => {
-      // tags still 404 on live but ignore so the page still works
-    })
-    .finally(() => setLoading(false));
-};
-
-  useEffect(load, []);
   const filtered = novels.filter(n =>
     !query || n.slug.toLowerCase().includes(query.toLowerCase()) || n.penName.toLowerCase().includes(query.toLowerCase()) ||
     n.translations.some(t => t.title.toLowerCase().includes(query.toLowerCase()))
@@ -93,7 +89,6 @@ export default function AdminNovels() {
         </button>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input type="text" value={query} onChange={e => setQuery(e.target.value)}
@@ -103,7 +98,6 @@ export default function AdminNovels() {
 
       {error && <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">{error}</div>}
 
-      {/* Table */}
       <div className="card overflow-hidden">
         {loading ? (
           <div className="py-10 flex justify-center"><span className="w-6 h-6 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" /></div>
@@ -157,7 +151,6 @@ export default function AdminNovels() {
         )}
       </div>
 
-      {/* Add Novel Modal */}
       {showAdd && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <form onSubmit={handleAdd} className="bg-white dark:bg-[#1e1e32] rounded-2xl p-6 w-full max-w-lg animate-slide-up">
@@ -205,4 +198,4 @@ export default function AdminNovels() {
       )}
     </div>
   );
-      }
+}
