@@ -3,7 +3,6 @@
   "services": {
     "jnovel-backend": {
       "root": "jnovel-backend",
-      "entrypoint": "Dockerfile",
       "runtime": "container"
     }
   },
