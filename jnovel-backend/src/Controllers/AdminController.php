@@ -50,13 +50,15 @@ class AdminController
         $novelIds = array_column($novels, 'id');
         $placeholders = implode(',', array_fill(0, count($novelIds), '?'));
         $transStmt = $pdo->prepare("
-            SELECT novel_id, language, title, status, publish_status, chapters_count
+        $transStmt = $pdo->prepare("
+            SELECT id, novel_id, language, title, status, publish_status, chapters_count
             FROM novel_translations WHERE novel_id IN ($placeholders)
         ");
         $transStmt->execute($novelIds);
         $translationsByNovel = [];
         foreach ($transStmt->fetchAll() as $t) {
             $translationsByNovel[$t['novel_id']][] = [
+                'id' => (int) $t['id'],
                 'language' => $t['language'],
                 'title' => $t['title'],
                 'status' => $t['status'],
