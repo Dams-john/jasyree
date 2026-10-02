@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Eye, Search } from 'lucide-react';
+import { Plus, Eye, Search, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { adminApi, AdminNovelListItem, PenName, Tag } from '../../lib/resources';
 import { ApiError } from '../../lib/api';
@@ -20,6 +20,7 @@ export default function AdminNovels() {
   const [status, setStatus] = useState('ongoing');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [publishingId, setPublishingId] = useState<number | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -73,6 +74,18 @@ export default function AdminNovels() {
       setFormError(err instanceof ApiError ? err.message : 'Failed to create novel.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePublish = async (translationId: number) => {
+    setPublishingId(translationId);
+    try {
+      await adminApi.updateTranslation(translationId, { publishStatus: 'published' });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to publish.');
+    } finally {
+      setPublishingId(null);
     }
   };
 
@@ -140,6 +153,17 @@ export default function AdminNovels() {
                           <Link to={`/novel/${novel.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
                             <Eye className="w-4 h-4" />
                           </Link>
+                          {primary?.publishStatus !== 'published' && primary?.id != null && (
+                            <button
+                              type="button"
+                              title="Publish"
+                              disabled={publishingId === primary.id}
+                              onClick={() => handlePublish(primary.id)}
+                              className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
+                            >
+                              <Upload className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
