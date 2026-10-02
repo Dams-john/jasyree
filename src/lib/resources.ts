@@ -168,7 +168,7 @@ export interface AdminNovelListItem {
   isFeatured: boolean;
   rating: number;
   views: number;
-  translations: { language: string; title: string; status: string; publishStatus: string; chaptersCount: number }[];
+  translations: { id: number; language: string; title: string; status: string; publishStatus: string; chaptersCount: number }[];
 }
 
 export interface AdminNovelDetail {
