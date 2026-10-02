@@ -50,7 +50,6 @@ class AdminController
         $novelIds = array_column($novels, 'id');
         $placeholders = implode(',', array_fill(0, count($novelIds), '?'));
         $transStmt = $pdo->prepare("
-        $transStmt = $pdo->prepare("
             SELECT id, novel_id, language, title, status, publish_status, chapters_count
             FROM novel_translations WHERE novel_id IN ($placeholders)
         ");
