@@ -218,7 +218,9 @@ export const adminApi = {
   createPenName: (data: { name: string; bio?: string; avatar?: string }) =>
     apiFetch<{ id: number; name: string; slug: string }>('/admin/pen-names', { method: 'POST', body: JSON.stringify(data) }),
 
-  listTags: () => apiFetch<Tag[]>('/tags'),
+  listTags: () => apiFetch<Tag[]>('/admin/tags'),
+  createTag: (data: { name: string }) =>
+    apiFetch<Tag>('/admin/tags', { method: 'POST', body: JSON.stringify(data) }),
 
   broadcastNotification: (data: { title: string; message: string; audience?: 'all' | 'subscribers' }) =>
     apiFetch<{ recipientCount: number }>('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) }),
