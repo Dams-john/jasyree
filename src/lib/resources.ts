@@ -221,6 +221,14 @@ export const adminApi = {
   listTags: () => apiFetch<Tag[]>('/admin/tags'),
   createTag: (data: { name: string }) =>
     apiFetch<Tag>('/admin/tags', { method: 'POST', body: JSON.stringify(data) }),
+  stats: () => apiFetch<{
+    totalUsers: number;
+    totalNovels: number;
+    totalChapters: number;
+    publishedChapters: number;
+    totalReads: number;
+    revenue: number;
+  }>('/admin/stats'),
 
   broadcastNotification: (data: { title: string; message: string; audience?: 'all' | 'subscribers' }) =>
     apiFetch<{ recipientCount: number }>('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) }),
