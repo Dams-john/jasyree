@@ -77,10 +77,16 @@ export default function AdminNovels() {
     }
   };
 
-  const handlePublish = async (translationId: number) => {
-    setPublishingId(translationId);
+  const handlePublish = async (novelId: number) => {
+    setPublishingId(novelId);
     try {
-      await adminApi.updateTranslation(translationId, { publishStatus: 'published' });
+      const detail = await adminApi.showNovel(novelId);
+      const translation = detail.translations[0];
+      if (!translation?.id) {
+        setError('No translation found to publish.');
+        return;
+      }
+      await adminApi.updateTranslation(translation.id, { publishStatus: 'published' });
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to publish.');
@@ -88,7 +94,7 @@ export default function AdminNovels() {
       setPublishingId(null);
     }
   };
-
+  
   return (
     <div className="max-w-6xl space-y-5">
       <div className="flex items-center justify-between">
@@ -153,17 +159,17 @@ export default function AdminNovels() {
                           <Link to={`/novel/${novel.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
                             <Eye className="w-4 h-4" />
                           </Link>
-                          {primary?.publishStatus !== 'published' && primary?.id != null && (
-                            <button
-                              type="button"
-                              title="Publish"
-                              disabled={publishingId === primary.id}
-                              onClick={() => handlePublish(primary.id)}
-                              className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
-                            >
-                              <Upload className="w-4 h-4" />
-                            </button>
-                          )}
+                          {primary?.publishStatus !== 'published' && (
+  <button
+    type="button"
+    title="Publish"
+    disabled={publishingId === novel.id}
+    onClick={() => handlePublish(novel.id)}
+    className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
+  >
+    <Upload className="w-4 h-4" />
+  </button>
+)}
                         </div>
                       </td>
                     </tr>
