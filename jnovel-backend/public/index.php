@@ -111,6 +111,8 @@ $routes = [
     ['GET', '/api/genres', [GenreController::class, 'index']],
     ['GET', '/api/genres/{slug}/novels', [GenreController::class, 'novelsByGenre']],
     ['GET', '/api/tags', [TagController::class, 'index']],
+    ['GET',  '/api/admin/tags', [AdminController::class, 'listTags']],
+    ['POST', '/api/admin/tags', [AdminController::class, 'createTag']],
 
     ['GET', '/api/search', [NovelController::class, 'search']],
     ['GET', '/api/novels/{id}', [NovelController::class, 'show']],
