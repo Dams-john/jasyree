@@ -422,6 +422,57 @@ class AdminController
         ], 'Genre created.', 201);
     }
 
+    /** GET /api/admin/tags */
+    public function listTags(): void
+    {
+        AuthMiddleware::requireRole(['author', 'admin']);
+        $pdo = Database::connection();
+        $stmt = $pdo->query("
+            SELECT t.id, t.name, t.slug, COUNT(DISTINCT nvt.novel_id) AS novel_count
+            FROM tags t
+            LEFT JOIN novel_tags nvt ON nvt.tag_id = t.id
+            GROUP BY t.id
+            ORDER BY t.name ASC
+        ");
+        Response::success(array_map(fn($row) => [
+            'id' => (int) $row['id'],
+            'name' => $row['name'],
+            'slug' => $row['slug'],
+            'count' => (int) $row['novel_count'],
+        ], $stmt->fetchAll()));
+    }
+
+    /** POST /api/admin/tags */
+    public function createTag(): void
+    {
+        AuthMiddleware::requireRole(['admin', 'author']);
+        $data = $this->body();
+
+        (new Validator($data))
+            ->required('name', 'Tag name')
+            ->maxLength('name', 60)
+            ->validate();
+
+        $pdo = Database::connection();
+        $name = trim($data['name']);
+        $nameCheck = $pdo->prepare("SELECT id FROM tags WHERE name = ?");
+        $nameCheck->execute([$name]);
+        if ($nameCheck->fetch()) {
+            Response::error('A tag with this name already exists.', 409);
+        }
+
+        $slug = $this->uniqueSlug('tags', $this->slugify($name));
+        $stmt = $pdo->prepare("INSERT INTO tags (name, slug) VALUES (?, ?)");
+        $stmt->execute([$name, $slug]);
+
+        Response::success([
+            'id' => (int) $pdo->lastInsertId(),
+            'name' => $name,
+            'slug' => $slug,
+            'count' => 0,
+        ], 'Tag created.', 201);
+    }
+
     // ============================================================
     // NEW: DASHBOARD STATISTICS
     // ============================================================
