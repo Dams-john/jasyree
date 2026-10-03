@@ -17,6 +17,7 @@ export default function AdminNovels() {
   const [title, setTitle] = useState('');
   const [penNameId, setPenNameId] = useState<number | ''>('');
   const [synopsis, setSynopsis] = useState('');
+  const [cover, setCover] = useState('');
   const [status, setStatus] = useState('ongoing');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -65,10 +66,15 @@ export default function AdminNovels() {
         title,
         synopsis,
         status,
+        cover: cover.trim() || undefined,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
       });
       setShowAdd(false);
-      setTitle(''); setSynopsis(''); setPenNameId(''); setSelectedTagIds([]);
+      setTitle('');
+      setSynopsis('');
+      setCover('');
+      setPenNameId('');
+      setSelectedTagIds([]);
       load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Failed to create novel.');
@@ -94,7 +100,7 @@ export default function AdminNovels() {
       setPublishingId(null);
     }
   };
-  
+
   return (
     <div className="max-w-6xl space-y-5">
       <div className="flex items-center justify-between">
@@ -160,16 +166,16 @@ export default function AdminNovels() {
                             <Eye className="w-4 h-4" />
                           </Link>
                           {primary?.publishStatus !== 'published' && (
-  <button
-    type="button"
-    title="Publish"
-    disabled={publishingId === novel.id}
-    onClick={() => handlePublish(novel.id)}
-    className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
-  >
-    <Upload className="w-4 h-4" />
-  </button>
-)}
+                            <button
+                              type="button"
+                              title="Publish"
+                              disabled={publishingId === novel.id}
+                              onClick={() => handlePublish(novel.id)}
+                              className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
+                            >
+                              <Upload className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -193,6 +199,13 @@ export default function AdminNovels() {
                 {penNames.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <textarea value={synopsis} onChange={e => setSynopsis(e.target.value)} placeholder="Synopsis" className="input-field resize-none h-24" required />
+              <input
+                type="url"
+                value={cover}
+                onChange={e => setCover(e.target.value)}
+                placeholder="Cover image URL (optional)"
+                className="input-field"
+              />
               <select value={status} onChange={e => setStatus(e.target.value)} className="input-field">
                 <option value="ongoing">Ongoing</option>
                 <option value="completed">Completed</option>
@@ -228,4 +241,4 @@ export default function AdminNovels() {
       )}
     </div>
   );
-}
+      }
