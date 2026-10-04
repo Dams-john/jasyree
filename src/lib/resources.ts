@@ -200,6 +200,8 @@ export const adminApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  deleteNovel: (id: number) =>
+    apiFetch<null>(`/admin/novels/${id}`, { method: 'DELETE' }),
   addTranslation: (novelId: number, data: { language: string; title: string; synopsis: string; cover?: string; status?: string }) =>
     apiFetch<{ translationId: number }>(`/admin/novels/${novelId}/translations`, { method: 'POST', body: JSON.stringify(data) }),
   updateTranslation: (translationId: number, data: Record<string, unknown>) =>
