@@ -154,6 +154,39 @@ class AdminController
         Response::success(['novelId' => $novelId, 'translationId' => $translationId, 'slug' => $slug], 'Novel created.', 201);
     }
 
+    /** DELETE /api/admin/novels/{id} — remove novel + translations, chapters, tags, genres */
+    public function deleteNovel(string $id): void
+    {
+        $payload = AuthMiddleware::requireRole(['author', 'admin']);
+        $novel = $this->getOwnedNovelOr404((int) $id, $payload);
+        $pdo = Database::connection();
+
+        $pdo->beginTransaction();
+        try {
+            $transStmt = $pdo->prepare("SELECT id FROM novel_translations WHERE novel_id = ?");
+            $transStmt->execute([$novel['id']]);
+            $translationIds = $transStmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            if (!empty($translationIds)) {
+                $placeholders = implode(',', array_fill(0, count($translationIds), '?'));
+                $pdo->prepare("DELETE FROM chapters WHERE novel_translation_id IN ($placeholders)")
+                    ->execute($translationIds);
+            }
+
+            $pdo->prepare("DELETE FROM novel_translations WHERE novel_id = ?")->execute([$novel['id']]);
+            $pdo->prepare("DELETE FROM novel_tags WHERE novel_id = ?")->execute([$novel['id']]);
+            $pdo->prepare("DELETE FROM novel_genres WHERE novel_id = ?")->execute([$novel['id']]);
+            $pdo->prepare("DELETE FROM novels WHERE id = ?")->execute([$novel['id']]);
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        Response::success(null, 'Novel deleted.');
+    }
+
     /** POST /api/admin/novels/{id}/translations — add another language edition to an existing novel */
     public function addTranslation(string $id): void
     {
