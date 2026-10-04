@@ -175,6 +175,7 @@ $routes = [
     ['GET', '/api/admin/novels', [AdminController::class, 'listNovels']],
     ['POST', '/api/admin/novels', [AdminController::class, 'createNovel']],
     ['GET', '/api/admin/novels/{id}', [AdminController::class, 'showNovel']],
+    ['DELETE', '/api/admin/novels/{id}', [AdminController::class, 'deleteNovel']],
     ['POST', '/api/admin/novels/{id}/translations', [AdminController::class, 'addTranslation']],
     ['PUT', '/api/admin/translations/{id}', [AdminController::class, 'updateTranslation']],
 
