@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Eye, Search, Upload } from 'lucide-react';
+import { Plus, Eye, Search, Upload, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { adminApi, AdminNovelListItem, PenName, Tag } from '../../lib/resources';
 import { ApiError } from '../../lib/api';
@@ -22,6 +22,17 @@ export default function AdminNovels() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [publishingId, setPublishingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // Edit modal
+  const [editingNovelId, setEditingNovelId] = useState<number | null>(null);
+  const [editTranslationId, setEditTranslationId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editSynopsis, setEditSynopsis] = useState('');
+  const [editCover, setEditCover] = useState('');
+  const [editStatus, setEditStatus] = useState('ongoing');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -101,6 +112,61 @@ export default function AdminNovels() {
     }
   };
 
+  const openEdit = async (novelId: number) => {
+    setEditError('');
+    try {
+      const detail = await adminApi.showNovel(novelId);
+      const t = detail.translations[0];
+      if (!t) {
+        setError('No translation found to edit.');
+        return;
+      }
+      setEditingNovelId(novelId);
+      setEditTranslationId(t.id);
+      setEditTitle(t.title || '');
+      setEditSynopsis(t.synopsis || '');
+      setEditCover(t.cover || '');
+      setEditStatus(t.status || 'ongoing');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load novel for edit.');
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTranslationId) return;
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      await adminApi.updateTranslation(editTranslationId, {
+        title: editTitle,
+        synopsis: editSynopsis,
+        cover: editCover.trim() || null,
+        status: editStatus,
+      });
+      setEditingNovelId(null);
+      setEditTranslationId(null);
+      load();
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : 'Failed to update novel.');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (novelId: number, titleLabel: string) => {
+    if (!window.confirm(`Delete "${titleLabel}"? This cannot be undone.`)) return;
+    setDeletingId(novelId);
+    try {
+      await adminApi.deleteNovel(novelId);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to delete novel.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="max-w-6xl space-y-5">
       <div className="flex items-center justify-between">
@@ -144,10 +210,11 @@ export default function AdminNovels() {
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400 text-sm">No novels found.</td></tr>
                 ) : filtered.map((novel, i) => {
                   const primary = novel.translations[0];
+                  const label = primary?.title || novel.slug;
                   return (
                     <tr key={novel.id} className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${i === filtered.length - 1 ? 'border-0' : ''}`}>
                       <td className="px-4 py-3">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-[150px] sm:max-w-[200px]">{primary?.title || novel.slug}</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-[150px] sm:max-w-[200px]">{label}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden">{novel.penName}</p>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
@@ -161,10 +228,18 @@ export default function AdminNovels() {
                       <td className="px-4 py-3 hidden md:table-cell text-sm text-gray-700 dark:text-gray-300">{primary?.chaptersCount ?? 0}</td>
                       <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-700 dark:text-gray-300">{novel.views.toLocaleString()}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 justify-end">
-                          <Link to={`/novel/${novel.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
+                        <div className="flex items-center gap-1 justify-end">
+                          <Link to={`/novel/${novel.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors" title="View">
                             <Eye className="w-4 h-4" />
                           </Link>
+                          <button
+                            type="button"
+                            title="Edit"
+                            onClick={() => openEdit(novel.id)}
+                            className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
                           {primary?.publishStatus !== 'published' && (
                             <button
                               type="button"
@@ -176,6 +251,15 @@ export default function AdminNovels() {
                               <Upload className="w-4 h-4" />
                             </button>
                           )}
+                          <button
+                            type="button"
+                            title="Delete"
+                            disabled={deletingId === novel.id}
+                            onClick={() => handleDelete(novel.id, label)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -235,6 +319,29 @@ export default function AdminNovels() {
             <div className="flex gap-3 mt-5">
               <button type="button" onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Cancel</button>
               <button type="submit" disabled={submitting || penNames.length === 0} className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50">{submitting ? 'Adding…' : 'Add Novel'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editingNovelId !== null && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form onSubmit={handleEdit} className="bg-white dark:bg-[#1e1e32] rounded-2xl p-6 w-full max-w-lg">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Edit Novel</h3>
+            {editError && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">{editError}</div>}
+            <div className="space-y-3">
+              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Novel Title" className="input-field" required />
+              <textarea value={editSynopsis} onChange={e => setEditSynopsis(e.target.value)} placeholder="Synopsis" className="input-field resize-none h-24" required />
+              <input type="url" value={editCover} onChange={e => setEditCover(e.target.value)} placeholder="Cover image URL (optional)" className="input-field" />
+              <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="input-field">
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+                <option value="hiatus">Hiatus</option>
+              </select>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button type="button" onClick={() => { setEditingNovelId(null); setEditTranslationId(null); }} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
+              <button type="submit" disabled={editSubmitting} className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50">{editSubmitting ? 'Saving…' : 'Save'}</button>
             </div>
           </form>
         </div>
