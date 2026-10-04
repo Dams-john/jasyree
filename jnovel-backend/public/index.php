@@ -111,8 +111,6 @@ $routes = [
     ['GET', '/api/genres', [GenreController::class, 'index']],
     ['GET', '/api/genres/{slug}/novels', [GenreController::class, 'novelsByGenre']],
     ['GET', '/api/tags', [TagController::class, 'index']],
-    ['GET',  '/api/admin/tags', [AdminController::class, 'listTags']],
-    ['POST', '/api/admin/tags', [AdminController::class, 'createTag']],
 
     ['GET', '/api/search', [NovelController::class, 'search']],
     ['GET', '/api/novels/{id}', [NovelController::class, 'show']],
@@ -167,6 +165,8 @@ $routes = [
     // NEW: admin dashboard — genres, stats, notifications
     ['POST', '/api/admin/genres', [AdminController::class, 'createGenre']],
     ['GET', '/api/admin/stats', [AdminController::class, 'stats']],
+    ['GET',  '/api/admin/tags', [AdminController::class, 'listTags']],
+    ['POST', '/api/admin/tags', [AdminController::class, 'createTag']],
     ['POST', '/api/admin/notifications/broadcast', [AdminController::class, 'broadcastNotification']],
     ['POST', '/api/admin/users/{userId}/reward-coins', [AdminController::class, 'rewardCoins']],
     ['POST', '/api/admin/users/{userId}/subscription', [AdminController::class, 'grantSubscription']],
