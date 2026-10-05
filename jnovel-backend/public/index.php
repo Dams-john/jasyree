@@ -78,6 +78,9 @@ $uri = rtrim($uri, '/') ?: '/';
  * Patterns use {param} placeholders, matched via regex.
  */
 $routes = [
+    ['GET', '/api/admin/route-check', static function (): void {
+        Response::success(['ok' => true, 'routes' => 'tags-delete-v1']);
+    }],
     ['GET', '/api/health', static function (): void {
         Response::success(['status' => 'ok']);
     }],
