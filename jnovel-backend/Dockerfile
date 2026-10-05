@@ -1,3 +1,4 @@
+# force-rebuild 2026-10-05-tags-delete
 FROM php:8.2-apache
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
