@@ -183,6 +183,41 @@ export interface AdminNovelDetail {
   }[];
 }
 
+export interface CoinPackage {
+  id: number;
+  coins: number;
+  price: number;
+  currency: string;
+  bonus: number;
+  isPopular: boolean;
+  isBestValue: boolean;
+  image: string | null;
+}
+
+export interface SubscriptionPlan {
+  id: number;
+  name: string;
+  slug: string;
+  price: number;
+  currency: string;
+  period: string;
+  monthlyCoins: number;
+  features: string[];
+  color: string | null;
+  isPopular: boolean;
+  isBestValue: boolean;
+}
+
+export const paymentsApi = {
+  listCoinPackages: () => apiFetch<CoinPackage[]>('/payments/coin-packages', { skipAuth: true }),
+  listSubscriptionPlans: () => apiFetch<SubscriptionPlan[]>('/payments/subscription-plans', { skipAuth: true }),
+  checkout: (data: { type: 'coin_package' | 'subscription'; id: number }) =>
+    apiFetch<{ checkoutUrl: string; sessionId: string }>('/payments/checkout', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 export interface AdminChapterListItem {
   id: number; number: number; title: string; wordCount: number; isPremium: boolean;
   coinCost: number; publishStatus: string; publishedAt: string | null;
