@@ -60,6 +60,7 @@ require_once __DIR__ . '/../src/Controllers/AdminController.php';
 require_once __DIR__ . '/../src/Controllers/PenNameController.php';
 require_once __DIR__ . '/../src/Controllers/CommentController.php';
 require_once __DIR__ . '/../src/Controllers/TagController.php';
+require_once __DIR__ . '/../src/Controllers/PaymentController.php';
 
 // ---- Routing ----
 $method = $_SERVER['REQUEST_METHOD'];
