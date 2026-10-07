@@ -132,6 +132,10 @@ $routes = [
     ['POST', '/api/auth/resend-verification', [AuthController::class, 'resendVerification']],
     ['POST', '/api/auth/google', [AuthController::class, 'google']],
     ['POST', '/api/auth/apple', [AuthController::class, 'apple']],
+    ['GET',  '/api/payments/coin-packages', [PaymentController::class, 'listCoinPackages']],
+    ['GET',  '/api/payments/subscription-plans', [PaymentController::class, 'listSubscriptionPlans']],
+    ['POST', '/api/payments/checkout', [PaymentController::class, 'checkout']],
+    ['POST', '/api/payments/webhook', [PaymentController::class, 'webhook']],
 
     // User account
     ['PATCH', '/api/user/profile', [UserController::class, 'updateProfile']],
