@@ -78,6 +78,10 @@ if (!function_exists('appConfig')) {
                 'user' => env('DB_USER', $urlUser ?? env('MYSQLUSER', 'render_user')),
                 'pass' => env('DB_PASS', $urlPass ?? env('MYSQLPASSWORD', '')),
             ],
+            'stripe' => [
+                'secret_key' => env('STRIPE_SECRET_KEY', ''),
+                'webhook_secret' => env('STRIPE_WEBHOOK_SECRET', ''),
+            ],
             'jwt' => [
                 'secret' => env('JWT_SECRET', 'change-this-secret-in-env'),
                 'access_ttl' => (int) env('JWT_ACCESS_TTL', 900),
