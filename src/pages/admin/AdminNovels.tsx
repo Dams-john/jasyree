@@ -44,22 +44,25 @@ export default function AdminNovels() {
       }),
       adminApi.listPenNames().catch(() => [] as PenName[]),
       adminApi.listTags().catch(() => [] as Tag[]),
-    ]).then(([n, p, t]) => {
-      setNovels(n);
-      setPenNames(p);
-      setAvailableTags(t);
-    }).finally(() => setLoading(false));
+    ])
+      .then(([n, p, t]) => {
+        setNovels(n);
+        setPenNames(p);
+        setAvailableTags(t);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const filtered = novels.filter(n =>
-    !query ||
-    n.slug.toLowerCase().includes(query.toLowerCase()) ||
-    n.penName.toLowerCase().includes(query.toLowerCase()) ||
-    n.translations.some(t => t.title.toLowerCase().includes(query.toLowerCase()))
+  const filtered = novels.filter(
+    n =>
+      !query ||
+      n.slug.toLowerCase().includes(query.toLowerCase()) ||
+      n.penName.toLowerCase().includes(query.toLowerCase()) ||
+      n.translations.some(t => t.title.toLowerCase().includes(query.toLowerCase()))
   );
 
   const toggleTag = (tagId: number) => {
@@ -334,67 +337,6 @@ export default function AdminNovels() {
             </div>
 
             <div className="px-5 py-3 space-y-3 overflow-y-auto flex-1 min-h-0">
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Novel Title" className="input-field" required />
-              <select value={penNameId} onChange={e => setPenNameId(e.target.value ? Number(e.target.value) : '')} className="input-field" required>
-                <option value="">Select Pen Name…</option>
-                {penNames.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <textarea value={synopsis} onChange={e => setSynopsis(e.target.value)} placeholder="Synopsis" className="input-field resize-none h-24" required />
-              <input type="url" value={cover} onChange={e => setCover(e.target.value)} placeholder="Cover image URL (optional)" className="input-field" />
-              <select value={status} onChange={e => setStatus(e.target.value)} className="input-field">
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-                <option value="hiatus">Hiatus</option>
-              </select>
-              {availableTags.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Select Tags</label>
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
-                    {availableTags.map(tag => (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => toggleTag(tag.id)}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                          selectedTagIds.includes(tag.id)
-                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
-                        }`}
-                      >
-                        #{tag.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {penNames.length === 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">You need a pen name first — add one under Pen Names.</p>
-              )}
-            </div>
-
-            <div className="flex gap-3 p-4 pt-3 shrink-0 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1e1e32] sticky bottom-0">
-              <button
-                type="button"
-                onClick={() => setShowAdd(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || penNames.length === 0}
-                className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
-              >
-                {submitting ? 'Adding…' : 'Add Novel'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-            <div className="px-6 space-y-3 overflow-y-auto flex-1 min-h-0">
               <input
                 type="text"
                 value={title}
@@ -440,7 +382,7 @@ export default function AdminNovels() {
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
                     Select Tags
                   </label>
-                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableTags.map(tag => (
                       <button
                         key={tag.id}
@@ -465,11 +407,11 @@ export default function AdminNovels() {
               )}
             </div>
 
-            <div className="flex gap-3 p-6 pt-4 shrink-0 border-t border-gray-100 dark:border-gray-800">
+            <div className="flex gap-3 p-4 pt-3 shrink-0 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1e1e32]">
               <button
                 type="button"
                 onClick={() => setShowAdd(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 Cancel
               </button>
@@ -486,10 +428,10 @@ export default function AdminNovels() {
       )}
 
       {editingNovelId !== null && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <form
             onSubmit={handleEdit}
-            className="bg-white dark:bg-[#1e1e32] rounded-2xl p-6 w-full max-w-lg my-auto max-h-[min(90vh,720px)] overflow-y-auto"
+            className="bg-white dark:bg-[#1e1e32] rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[min(90vh,720px)] overflow-y-auto p-6 shadow-xl"
           >
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Edit Novel</h3>
             {editError && (
@@ -532,10 +474,11 @@ export default function AdminNovels() {
                 onClick={() => {
                   setEditingNovelId(null);
                   setEditTranslationId(null);
-                }}
+                }
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 Cancel
+              </button>
               <button
                 type="submit"
                 disabled={editSubmitting}
@@ -549,4 +492,4 @@ export default function AdminNovels() {
       )}
     </div>
   );
-      }
+}
