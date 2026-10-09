@@ -32,12 +32,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     <header className="sticky top-0 z-50 bg-white dark:bg-[#0f0f1a] border-b border-gray-100 dark:border-gray-800/50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 shrink-0">
-          <img
-            src="/logo.png"
-            alt="jasyre"
-            className="h-8 w-auto object-contain dark:brightness-0 dark:invert"
-          />
+        <Link to="/" className="flex items-center shrink-0">
           <span className="text-xl font-black text-[#e91e8c] tracking-tight">jasyre</span>
         </Link>
 
