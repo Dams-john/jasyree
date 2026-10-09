@@ -474,7 +474,7 @@ export default function AdminNovels() {
                 onClick={() => {
                   setEditingNovelId(null);
                   setEditTranslationId(null);
-                }
+                }}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 Cancel
