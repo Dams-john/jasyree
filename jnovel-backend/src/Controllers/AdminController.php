@@ -282,6 +282,190 @@ class AdminController
         }, $stmt->fetchAll()));
     }
 
+    /**
+     * POST /api/admin/translations/{id}/manuscript
+     * Multipart form field: file (.docx or .txt)
+     * Optional: publishStatus (default draft), isPremium, coinCost, startNumber
+     */
+    public function importManuscript(string $translationId): void
+    {
+        $payload = AuthMiddleware::requireRole(['author', 'admin']);
+        $translation = $this->getOwnedTranslationOr404((int) $translationId, $payload);
+
+        if (empty($_FILES['file']['tmp_name']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
+            Response::error('Please upload a .docx or .txt file.', 422);
+        }
+
+        $name = strtolower($_FILES['file']['name'] ?? '');
+        $tmp = $_FILES['file']['tmp_name'];
+        $publishStatus = $_POST['publishStatus'] ?? 'draft';
+        $isPremium = !empty($_POST['isPremium']);
+        $coinCost = (int) ($_POST['coinCost'] ?? 0);
+        $startNumber = max(1, (int) ($_POST['startNumber'] ?? 1));
+
+        if (str_ends_with($name, '.docx')) {
+            $text = $this->extractTextFromDocx($tmp);
+        } elseif (str_ends_with($name, '.txt')) {
+            $text = file_get_contents($tmp) ?: '';
+        } else {
+            Response::error('Only .docx or .txt files are supported.', 422);
+        }
+
+        $text = trim(str_replace("\r\n", "\n", $text));
+        if ($text === '') {
+            Response::error('Could not read any text from the file.', 422);
+        }
+
+        $chapters = $this->splitManuscriptIntoChapters($text);
+        if (count($chapters) === 0) {
+            Response::error('No chapters found. Use headings like "Chapter 1" in the document.', 422);
+        }
+
+        $pdo = Database::connection();
+
+        // Next free number if startNumber collides
+        $maxStmt = $pdo->prepare("SELECT COALESCE(MAX(number), 0) AS m FROM chapters WHERE novel_translation_id = ?");
+        $maxStmt->execute([$translation['id']]);
+        $maxNum = (int) $maxStmt->fetch()['m'];
+        $number = max($startNumber, $maxNum + 1);
+
+        $created = [];
+        $pdo->beginTransaction();
+        try {
+            $ins = $pdo->prepare("
+                INSERT INTO chapters (novel_translation_id, number, title, content, word_count, is_premium, coin_cost, publish_status, published_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $publishedAt = $publishStatus === 'published' ? date('Y-m-d H:i:s') : null;
+
+            foreach ($chapters as $ch) {
+                $content = trim($ch['content']);
+                if ($content === '') {
+                    continue;
+                }
+                $title = $ch['title'] !== '' ? $ch['title'] : ('Chapter ' . $number);
+                $wordCount = str_word_count(strip_tags($content));
+                $ins->execute([
+                    $translation['id'],
+                    $number,
+                    $title,
+                    $content,
+                    $wordCount,
+                    $isPremium ? 1 : 0,
+                    $coinCost,
+                    $publishStatus,
+                    $publishedAt,
+                ]);
+                $created[] = [
+                    'chapterId' => (int) $pdo->lastInsertId(),
+                    'number' => $number,
+                    'title' => $title,
+                ];
+                $number++;
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        $this->recalcChaptersCount((int) $translation['id']);
+
+        Response::success([
+            'createdCount' => count($created),
+            'chapters' => $created,
+        ], count($created) . ' chapters imported.', 201);
+    }
+
+    private function extractTextFromDocx(string $path): string
+    {
+        if (!class_exists('ZipArchive')) {
+            Response::error('Server cannot read DOCX (ZipArchive missing).', 500);
+        }
+        $zip = new ZipArchive();
+        if ($zip->open($path) !== true) {
+            Response::error('Could not open DOCX file.', 422);
+        }
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        if ($xml === false || $xml === '') {
+            Response::error('DOCX has no document.xml.', 422);
+        }
+
+        $xml = preg_replace('/<w:tab[^>]*\/>/', "\t", $xml);
+        $xml = preg_replace('/<\/w:p>/', "\n", $xml);
+        $xml = preg_replace('/<w:br[^>]*\/>/', "\n", $xml);
+
+        $dom = new DOMDocument();
+        @$dom->loadXML($xml);
+        $text = $dom->textContent ?? '';
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        $text = preg_replace("/\n{3,}/", "\n\n", $text);
+        return trim($text);
+    }
+
+    /** Split on lines like "Chapter 1", "CHAPTER 12: Title", "Ch. 3 - Name" */
+    private function splitManuscriptIntoChapters(string $text): array
+    {
+        $lines = explode("\n", $text);
+        \( pattern = '/^(chapter|ch\.?)\s*(\d+)\s*([:.\-–—]\s*(.+))? \)/i';
+
+        $chapters = [];
+        $currentTitle = '';
+        $currentBody = [];
+
+        $flush = function () use (&$chapters, &$currentTitle, &$currentBody) {
+            $body = trim(implode("\n", $currentBody));
+            if ($body === '' && $currentTitle === '') {
+                return;
+            }
+            if ($currentTitle === '' && $body === '') {
+                return;
+            }
+            // Skip leading junk before first chapter heading only if we already have chapters
+            if ($currentTitle === '' && count($chapters) === 0 && $body !== '') {
+                // Treat as Chapter 1 if no headings at all — handled later
+                $chapters[] = ['title' => 'Chapter 1', 'content' => $body];
+            } elseif ($currentTitle !== '') {
+                $chapters[] = ['title' => $currentTitle, 'content' => $body];
+            }
+            $currentTitle = '';
+            $currentBody = [];
+        };
+
+        $foundHeading = false;
+        foreach ($lines as $line) {
+            $trim = trim($line);
+            if (preg_match($pattern, $trim, $m)) {
+                $foundHeading = true;
+                if ($currentTitle !== '' || count($currentBody) > 0) {
+                    $body = trim(implode("\n", $currentBody));
+                    if ($currentTitle !== '') {
+                        $chapters[] = ['title' => $currentTitle, 'content' => $body];
+                    } elseif ($body !== '' && count($chapters) === 0) {
+                        // front matter before first heading — skip
+                    }
+                }
+                $extra = isset($m[4]) ? trim($m[4]) : '';
+                $currentTitle = $extra !== ''
+                    ? ('Chapter ' . $m[2] . ': ' . $extra)
+                    : ('Chapter ' . $m[2]);
+                $currentBody = [];
+            } else {
+                $currentBody[] = $line;
+            }
+        }
+
+        if ($currentTitle !== '') {
+            $chapters[] = ['title' => $currentTitle, 'content' => trim(implode("\n", $currentBody))];
+        } elseif (!$foundHeading) {
+            // No "Chapter N" headings — one chapter from whole file
+            $chapters = [['title' => 'Chapter 1', 'content' => trim($text)]];
+        }
+
+        return array_values(array_filter($chapters, fn($c) => trim($c['content']) !== ''));
+}
+
     /** POST /api/admin/translations/{id}/chapters */
     public function createChapter(string $translationId): void
     {
