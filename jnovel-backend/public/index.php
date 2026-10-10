@@ -192,6 +192,11 @@ $routes = [
     ['POST', '/api/admin/translations/{id}/chapters', [AdminController::class, 'createChapter']],
     ['PUT', '/api/admin/chapters/{id}', [AdminController::class, 'updateChapter']],
     ['DELETE', '/api/admin/chapters/{id}', [AdminController::class, 'deleteChapter']],
+
+    ['GET',  '/api/admin/coin-packages', [AdminController::class, 'listCoinPackages']],
+    ['PUT',  '/api/admin/coin-packages/{id}', [AdminController::class, 'updateCoinPackage']],
+    ['GET',  '/api/admin/subscription-plans', [AdminController::class, 'listSubscriptionPlans']],
+    ['PUT',  '/api/admin/subscription-plans/{id}', [AdminController::class, 'updateSubscriptionPlan']],
 ];
 
 foreach ($routes as [$routeMethod, $pattern, $handler]) {
