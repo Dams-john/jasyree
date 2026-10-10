@@ -192,6 +192,7 @@ $routes = [
     ['POST', '/api/admin/translations/{id}/chapters', [AdminController::class, 'createChapter']],
     ['PUT', '/api/admin/chapters/{id}', [AdminController::class, 'updateChapter']],
     ['DELETE', '/api/admin/chapters/{id}', [AdminController::class, 'deleteChapter']],
+    ['POST', '/api/admin/translations/{id}/chapters/manuscript', [AdminController::class, 'importManuscript']],
 
     ['GET',  '/api/admin/coin-packages', [AdminController::class, 'listCoinPackages']],
     ['PUT',  '/api/admin/coin-packages/{id}', [AdminController::class, 'updateCoinPackage']],
