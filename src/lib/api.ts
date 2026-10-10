@@ -4,8 +4,12 @@ const ACCESS_KEY = 'jasyre_access_token';
 const REFRESH_KEY = 'jasyre_refresh_token';
 
 export const tokenStorage = {
-  get accessToken() { return localStorage.getItem(ACCESS_KEY); },
-  get refreshToken() { return localStorage.getItem(REFRESH_KEY); },
+  get accessToken() {
+    return localStorage.getItem(ACCESS_KEY);
+  },
+  get refreshToken() {
+    return localStorage.getItem(REFRESH_KEY);
+  },
   set(accessToken: string, refreshToken: string) {
     localStorage.setItem(ACCESS_KEY, accessToken);
     localStorage.setItem(REFRESH_KEY, refreshToken);
@@ -77,24 +81,36 @@ async function refreshTokens(): Promise<boolean> {
         return true;
       })
       .catch(() => false)
-      .finally(() => { refreshPromise = null; });
+      .finally(() => {
+        refreshPromise = null;
+      });
   }
   return refreshPromise;
 }
 
 export async function apiFetch<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { params, skipAuth, skipRefresh, headers, ...rest } = options;
+  const { params, skipAuth, skipRefresh, headers, body, ...rest } = options;
+
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
 
   const finalHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(headers as Record<string, string>),
   };
+
+  // Only set JSON Content-Type when body is not FormData (browser sets multipart boundary)
+  if (!isFormData) {
+    finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json';
+  }
 
   if (!skipAuth && tokenStorage.accessToken) {
     finalHeaders.Authorization = `Bearer ${tokenStorage.accessToken}`;
   }
 
-  const res = await fetch(buildUrl(path, params), { ...rest, headers: finalHeaders });
+  const res = await fetch(buildUrl(path, params), {
+    ...rest,
+    body,
+    headers: finalHeaders,
+  });
 
   if (res.status === 401 && !skipAuth && !skipRefresh && tokenStorage.refreshToken) {
     const refreshed = await refreshTokens();
@@ -122,16 +138,24 @@ export async function apiFetchPaginated<T = unknown>(
   path: string,
   options: RequestOptions = {}
 ): Promise<{ items: T[]; total: number; page: number; perPage: number; totalPages: number }> {
-  const { params, skipAuth, skipRefresh, headers, ...rest } = options;
+  const { params, skipAuth, skipRefresh, headers, body, ...rest } = options;
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+
   const finalHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(headers as Record<string, string>),
   };
+  if (!isFormData) {
+    finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json';
+  }
   if (!skipAuth && tokenStorage.accessToken) {
     finalHeaders.Authorization = `Bearer ${tokenStorage.accessToken}`;
   }
 
-  const res = await fetch(buildUrl(path, params), { ...rest, headers: finalHeaders });
+  const res = await fetch(buildUrl(path, params), {
+    ...rest,
+    body,
+    headers: finalHeaders,
+  });
 
   if (res.status === 401 && !skipAuth && !skipRefresh && tokenStorage.refreshToken) {
     const refreshed = await refreshTokens();
