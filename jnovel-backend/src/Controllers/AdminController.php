@@ -19,7 +19,7 @@ class AdminController
     // NOVELS
     // ============================================================
 
-    /** GET /api/admin/novels — list novels the requesting user can manage */
+    /** GET /api/admin/novels */
     public function listNovels(): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -78,7 +78,7 @@ class AdminController
         ], $novels));
     }
 
-    /** GET /api/admin/novels/{id} — full detail incl. all translations */
+    /** GET /api/admin/novels/{id} */
     public function showNovel(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -111,7 +111,7 @@ class AdminController
         ]);
     }
 
-    /** POST /api/admin/novels — creates the novel + its first language edition in one call */
+    /** POST /api/admin/novels */
     public function createNovel(): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -154,7 +154,7 @@ class AdminController
         Response::success(['novelId' => $novelId, 'translationId' => $translationId, 'slug' => $slug], 'Novel created.', 201);
     }
 
-    /** DELETE /api/admin/novels/{id} — remove novel + translations, chapters, tags, genres */
+    /** DELETE /api/admin/novels/{id} */
     public function deleteNovel(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -187,7 +187,7 @@ class AdminController
         Response::success(null, 'Novel deleted.');
     }
 
-    /** POST /api/admin/novels/{id}/translations — add another language edition to an existing novel */
+    /** POST /api/admin/novels/{id}/translations */
     public function addTranslation(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -211,7 +211,7 @@ class AdminController
         Response::success(['translationId' => $translationId], 'Language edition added.', 201);
     }
 
-    /** PUT /api/admin/translations/{id} — edit a language edition's metadata (title/synopsis/cover/status) */
+    /** PUT /api/admin/translations/{id} */
     public function updateTranslation(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -251,10 +251,10 @@ class AdminController
     }
 
     // ============================================================
-    // CHAPTERS (per language edition)
+    // CHAPTERS
     // ============================================================
 
-    /** GET /api/admin/translations/{id}/chapters — full chapter list incl. drafts/scheduled, for the admin dashboard */
+    /** GET /api/admin/translations/{id}/chapters */
     public function listChapters(string $translationId): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -283,9 +283,9 @@ class AdminController
     }
 
     /**
-     * POST /api/admin/translations/{id}/manuscript
-     * Multipart form field: file (.docx or .txt)
-     * Optional: publishStatus (default draft), isPremium, coinCost, startNumber
+     * POST /api/admin/translations/{id}/chapters/manuscript
+     * Multipart: file (.docx or .txt)
+     * Optional POST fields: publishStatus, isPremium, coinCost, startNumber
      */
     public function importManuscript(string $translationId): void
     {
@@ -323,7 +323,6 @@ class AdminController
 
         $pdo = Database::connection();
 
-        // Next free number if startNumber collides
         $maxStmt = $pdo->prepare("SELECT COALESCE(MAX(number), 0) AS m FROM chapters WHERE novel_translation_id = ?");
         $maxStmt->execute([$translation['id']]);
         $maxNum = (int) $maxStmt->fetch()['m'];
@@ -408,43 +407,22 @@ class AdminController
     private function splitManuscriptIntoChapters(string $text): array
     {
         $lines = explode("\n", $text);
-        \( pattern = '/^(chapter|ch\.?)\s*(\d+)\s*([:.\-–—]\s*(.+))? \)/i';
+        \( pattern = '/^(chapter|ch\.?)\s*(\d+)\s*([:.\-\x{2013}\x{2014}]\s*(.+))? \)/iu';
 
         $chapters = [];
         $currentTitle = '';
         $currentBody = [];
-
-        $flush = function () use (&$chapters, &$currentTitle, &$currentBody) {
-            $body = trim(implode("\n", $currentBody));
-            if ($body === '' && $currentTitle === '') {
-                return;
-            }
-            if ($currentTitle === '' && $body === '') {
-                return;
-            }
-            // Skip leading junk before first chapter heading only if we already have chapters
-            if ($currentTitle === '' && count($chapters) === 0 && $body !== '') {
-                // Treat as Chapter 1 if no headings at all — handled later
-                $chapters[] = ['title' => 'Chapter 1', 'content' => $body];
-            } elseif ($currentTitle !== '') {
-                $chapters[] = ['title' => $currentTitle, 'content' => $body];
-            }
-            $currentTitle = '';
-            $currentBody = [];
-        };
-
         $foundHeading = false;
+
         foreach ($lines as $line) {
             $trim = trim($line);
             if (preg_match($pattern, $trim, $m)) {
                 $foundHeading = true;
-                if ($currentTitle !== '' || count($currentBody) > 0) {
-                    $body = trim(implode("\n", $currentBody));
-                    if ($currentTitle !== '') {
-                        $chapters[] = ['title' => $currentTitle, 'content' => $body];
-                    } elseif ($body !== '' && count($chapters) === 0) {
-                        // front matter before first heading — skip
-                    }
+                if ($currentTitle !== '') {
+                    $chapters[] = [
+                        'title' => $currentTitle,
+                        'content' => trim(implode("\n", $currentBody)),
+                    ];
                 }
                 $extra = isset($m[4]) ? trim($m[4]) : '';
                 $currentTitle = $extra !== ''
@@ -457,14 +435,19 @@ class AdminController
         }
 
         if ($currentTitle !== '') {
-            $chapters[] = ['title' => $currentTitle, 'content' => trim(implode("\n", $currentBody))];
+            $chapters[] = [
+                'title' => $currentTitle,
+                'content' => trim(implode("\n", $currentBody)),
+            ];
         } elseif (!$foundHeading) {
-            // No "Chapter N" headings — one chapter from whole file
             $chapters = [['title' => 'Chapter 1', 'content' => trim($text)]];
         }
 
-        return array_values(array_filter($chapters, fn($c) => trim($c['content']) !== ''));
-}
+        return array_values(array_filter(
+            $chapters,
+            static fn(array $c): bool => trim($c['content']) !== ''
+        ));
+    }
 
     /** POST /api/admin/translations/{id}/chapters */
     public function createChapter(string $translationId): void
@@ -509,8 +492,6 @@ class AdminController
 
         $this->recalcChaptersCount((int) $translation['id']);
 
-        // NEW: only notify if this chapter is live right now — a future-scheduled chapter
-        // notifies once it's actually published, not at creation time.
         $isLiveNow = $publishStatus === 'published' && $publishedAt && strtotime($publishedAt) <= time();
         if ($isLiveNow) {
             $this->notifyNewChapter((int) $translation['id'], $data['number'], $data['title']);
@@ -519,7 +500,7 @@ class AdminController
         Response::success(['chapterId' => $chapterId], 'Chapter created.', 201);
     }
 
-    /** PUT /api/admin/chapters/{id} — edit content, premium/coin settings, or (re)schedule publishing */
+    /** PUT /api/admin/chapters/{id} */
     public function updateChapter(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -552,7 +533,6 @@ class AdminController
             $params[] = $data['publishStatus'];
         }
         if (array_key_exists('publishedAt', $data)) {
-            // Lets the admin schedule a future date, or clear it back to null (unscheduled draft).
             $fields[] = 'published_at = ?';
             $params[] = $data['publishedAt'];
         }
@@ -566,8 +546,6 @@ class AdminController
         $stmt = $pdo->prepare("UPDATE chapters SET " . implode(', ', $fields) . " WHERE id = ?");
         $stmt->execute($params);
 
-        // NEW: notify only on the transition from "not visible yet" to "live now" — never on
-        // routine edits to an already-published chapter, and never twice for the same chapter.
         $wasLive = $chapter['publish_status'] === 'published'
             && $chapter['published_at'] && strtotime($chapter['published_at']) <= time();
 
@@ -600,10 +578,10 @@ class AdminController
     }
 
     // ============================================================
-    // NEW: GENRES
+    // GENRES / TAGS
     // ============================================================
 
-    /** POST /api/admin/genres — admin only (genres are shared platform-wide taxonomy) */
+    /** POST /api/admin/genres */
     public function createGenre(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -691,10 +669,10 @@ class AdminController
     }
 
     // ============================================================
-    // NEW: DASHBOARD STATISTICS
+    // DASHBOARD STATISTICS
     // ============================================================
 
-    /** GET /api/admin/stats — admin only (platform-wide figures) */
+    /** GET /api/admin/stats */
     public function stats(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -708,8 +686,6 @@ class AdminController
         ")->fetch()['c'];
         $totalReads = (int) $pdo->query("SELECT COUNT(*) AS c FROM chapter_reads")->fetch()['c'];
 
-        // Revenue figures — these tables exist and are ready, but will read 0 until
-        // a payment provider is actually integrated and starts writing real transactions.
         $revenueRow = $pdo->query("
             SELECT COALESCE(SUM(amount), 0) AS total FROM payment_transactions WHERE status = 'successful'
         ")->fetch();
@@ -737,17 +713,15 @@ class AdminController
                 'total' => (float) $subscriptionSalesRow['total'],
                 'count' => (int) $subscriptionSalesRow['count'],
             ],
-            // No ads system exists yet (no table, no tracking) — null makes that explicit
-            // rather than misleadingly showing $0 as if ads ran and earned nothing.
             'advertisementRevenue' => null,
         ]);
     }
 
     // ============================================================
-    // NEW: NOTIFICATIONS (admin-triggered)
+    // NOTIFICATIONS / REWARDS
     // ============================================================
 
-    /** POST /api/admin/notifications/broadcast — send a promo notification to many users at once */
+    /** POST /api/admin/notifications/broadcast */
     public function broadcastNotification(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -770,7 +744,7 @@ class AdminController
         Response::success(['recipientCount' => count($userIds)], 'Promotion sent.', 201);
     }
 
-    /** POST /api/admin/users/{userId}/reward-coins — grant coins to a user, e.g. for an event or apology credit */
+    /** POST /api/admin/users/{userId}/reward-coins */
     public function rewardCoins(string $userId): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -820,7 +794,7 @@ class AdminController
         Response::success(['newBalance' => $newBalance], 'Coins granted.');
     }
 
-    /** POST /api/admin/users/{userId}/subscription — manually grant/update a user's subscription (e.g. comping a beta tester) */
+    /** POST /api/admin/users/{userId}/subscription */
     public function grantSubscription(string $userId): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -842,7 +816,6 @@ class AdminController
             Response::error('Unknown subscription plan.', 404);
         }
 
-        // End any currently active subscription before starting the new one.
         $pdo->prepare("UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE user_id = ? AND status = 'active'")
             ->execute([$userId]);
 
@@ -864,10 +837,166 @@ class AdminController
     }
 
     // ============================================================
+    // PRICING
+    // ============================================================
+
+    /** GET /api/admin/coin-packages */
+    public function listCoinPackages(): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $pdo = Database::connection();
+        $rows = $pdo->query("
+            SELECT id, coins, price, currency, bonus, is_popular, is_best_value, image, is_active, sort_order
+            FROM coin_packages ORDER BY sort_order ASC, id ASC
+        ")->fetchAll();
+
+        Response::success(array_map(fn($r) => [
+            'id' => (int) $r['id'],
+            'coins' => (int) $r['coins'],
+            'price' => (float) $r['price'],
+            'currency' => $r['currency'],
+            'bonus' => (int) $r['bonus'],
+            'isPopular' => (bool) $r['is_popular'],
+            'isBestValue' => (bool) $r['is_best_value'],
+            'image' => $r['image'],
+            'isActive' => (bool) $r['is_active'],
+            'sortOrder' => (int) $r['sort_order'],
+        ], $rows));
+    }
+
+    /** PUT /api/admin/coin-packages/{id} */
+    public function updateCoinPackage(string $id): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare("SELECT id FROM coin_packages WHERE id = ?");
+        $stmt->execute([(int) $id]);
+        if (!$stmt->fetch()) {
+            Response::error('Coin package not found.', 404);
+        }
+
+        $fields = [];
+        $params = [];
+        if (array_key_exists('price', $data)) {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['price'];
+        }
+        if (array_key_exists('currency', $data)) {
+            $fields[] = 'currency = ?';
+            $params[] = strtoupper(trim((string) $data['currency']));
+        }
+        if (array_key_exists('coins', $data)) {
+            $fields[] = 'coins = ?';
+            $params[] = (int) $data['coins'];
+        }
+        if (array_key_exists('bonus', $data)) {
+            $fields[] = 'bonus = ?';
+            $params[] = (int) $data['bonus'];
+        }
+        if (array_key_exists('isActive', $data)) {
+            $fields[] = 'is_active = ?';
+            $params[] = $data['isActive'] ? 1 : 0;
+        }
+        if (array_key_exists('isPopular', $data)) {
+            $fields[] = 'is_popular = ?';
+            $params[] = $data['isPopular'] ? 1 : 0;
+        }
+        if (array_key_exists('isBestValue', $data)) {
+            $fields[] = 'is_best_value = ?';
+            $params[] = $data['isBestValue'] ? 1 : 0;
+        }
+        if (empty($fields)) {
+            Response::error('No fields to update.', 422);
+        }
+        $params[] = (int) $id;
+        $pdo->prepare('UPDATE coin_packages SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'Coin package updated.');
+    }
+
+    /** GET /api/admin/subscription-plans */
+    public function listSubscriptionPlans(): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $pdo = Database::connection();
+        $rows = $pdo->query("
+            SELECT id, name, slug, price, currency, period, monthly_coins, features, color,
+                   is_popular, is_best_value, is_active, sort_order
+            FROM subscription_plans ORDER BY sort_order ASC, id ASC
+        ")->fetchAll();
+
+        Response::success(array_map(function ($r) {
+            $features = json_decode($r['features'] ?? '[]', true);
+            return [
+                'id' => (int) $r['id'],
+                'name' => $r['name'],
+                'slug' => $r['slug'],
+                'price' => (float) $r['price'],
+                'currency' => $r['currency'],
+                'period' => $r['period'],
+                'monthlyCoins' => (int) $r['monthly_coins'],
+                'features' => is_array($features) ? $features : [],
+                'color' => $r['color'],
+                'isPopular' => (bool) $r['is_popular'],
+                'isBestValue' => (bool) $r['is_best_value'],
+                'isActive' => (bool) $r['is_active'],
+                'sortOrder' => (int) $r['sort_order'],
+            ];
+        }, $rows));
+    }
+
+    /** PUT /api/admin/subscription-plans/{id} */
+    public function updateSubscriptionPlan(string $id): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare("SELECT id FROM subscription_plans WHERE id = ?");
+        $stmt->execute([(int) $id]);
+        if (!$stmt->fetch()) {
+            Response::error('Subscription plan not found.', 404);
+        }
+
+        $fields = [];
+        $params = [];
+        if (array_key_exists('price', $data)) {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['price'];
+        }
+        if (array_key_exists('currency', $data)) {
+            $fields[] = 'currency = ?';
+            $params[] = strtoupper(trim((string) $data['currency']));
+        }
+        if (array_key_exists('monthlyCoins', $data)) {
+            $fields[] = 'monthly_coins = ?';
+            $params[] = (int) $data['monthlyCoins'];
+        }
+        if (array_key_exists('isActive', $data)) {
+            $fields[] = 'is_active = ?';
+            $params[] = $data['isActive'] ? 1 : 0;
+        }
+        if (array_key_exists('isPopular', $data)) {
+            $fields[] = 'is_popular = ?';
+            $params[] = $data['isPopular'] ? 1 : 0;
+        }
+        if (array_key_exists('isBestValue', $data)) {
+            $fields[] = 'is_best_value = ?';
+            $params[] = $data['isBestValue'] ? 1 : 0;
+        }
+        if (empty($fields)) {
+            Response::error('No fields to update.', 422);
+        }
+        $params[] = (int) $id;
+        $pdo->prepare('UPDATE subscription_plans SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'Subscription plan updated.');
+    }
+
+    // ============================================================
     // Helpers
     // ============================================================
 
-    /** NEW: notifies everyone who favorited/bookmarked a novel that a new chapter just went live. */
     private function notifyNewChapter(int $translationId, int $chapterNumber, string $chapterTitle): void
     {
         $pdo = Database::connection();
@@ -1037,161 +1166,5 @@ class AdminController
             Response::error('Chapter not found or you do not have access to it.', 404);
         }
         return $chapter;
-    }
-    // ============================================================
-    // PRICING (admin)
-    // ============================================================
-
-    /** GET /api/admin/coin-packages */
-    public function listCoinPackages(): void
-    {
-        AuthMiddleware::requireRole(['admin']);
-        $pdo = Database::connection();
-        $rows = $pdo->query("
-            SELECT id, coins, price, currency, bonus, is_popular, is_best_value, image, is_active, sort_order
-            FROM coin_packages ORDER BY sort_order ASC, id ASC
-        ")->fetchAll();
-
-        Response::success(array_map(fn($r) => [
-            'id' => (int) $r['id'],
-            'coins' => (int) $r['coins'],
-            'price' => (float) $r['price'],
-            'currency' => $r['currency'],
-            'bonus' => (int) $r['bonus'],
-            'isPopular' => (bool) $r['is_popular'],
-            'isBestValue' => (bool) $r['is_best_value'],
-            'image' => $r['image'],
-            'isActive' => (bool) $r['is_active'],
-            'sortOrder' => (int) $r['sort_order'],
-        ], $rows));
-    }
-
-    /** PUT /api/admin/coin-packages/{id} */
-    public function updateCoinPackage(string $id): void
-    {
-        AuthMiddleware::requireRole(['admin']);
-        $data = $this->body();
-        $pdo = Database::connection();
-
-        $stmt = $pdo->prepare("SELECT id FROM coin_packages WHERE id = ?");
-        $stmt->execute([(int) $id]);
-        if (!$stmt->fetch()) {
-            Response::error('Coin package not found.', 404);
-        }
-
-        $fields = [];
-        $params = [];
-        if (array_key_exists('price', $data)) {
-            $fields[] = 'price = ?';
-            $params[] = (float) $data['price'];
-        }
-        if (array_key_exists('currency', $data)) {
-            $fields[] = 'currency = ?';
-            $params[] = strtoupper(trim((string) $data['currency']));
-        }
-        if (array_key_exists('coins', $data)) {
-            $fields[] = 'coins = ?';
-            $params[] = (int) $data['coins'];
-        }
-        if (array_key_exists('bonus', $data)) {
-            $fields[] = 'bonus = ?';
-            $params[] = (int) $data['bonus'];
-        }
-        if (array_key_exists('isActive', $data)) {
-            $fields[] = 'is_active = ?';
-            $params[] = $data['isActive'] ? 1 : 0;
-        }
-        if (array_key_exists('isPopular', $data)) {
-            $fields[] = 'is_popular = ?';
-            $params[] = $data['isPopular'] ? 1 : 0;
-        }
-        if (array_key_exists('isBestValue', $data)) {
-            $fields[] = 'is_best_value = ?';
-            $params[] = $data['isBestValue'] ? 1 : 0;
-        }
-        if (empty($fields)) {
-            Response::error('No fields to update.', 422);
-        }
-        $params[] = (int) $id;
-        $pdo->prepare('UPDATE coin_packages SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
-        Response::success(null, 'Coin package updated.');
-    }
-
-    /** GET /api/admin/subscription-plans */
-    public function listSubscriptionPlans(): void
-    {
-        AuthMiddleware::requireRole(['admin']);
-        $pdo = Database::connection();
-        $rows = $pdo->query("
-            SELECT id, name, slug, price, currency, period, monthly_coins, features, color,
-                   is_popular, is_best_value, is_active, sort_order
-            FROM subscription_plans ORDER BY sort_order ASC, id ASC
-        ")->fetchAll();
-
-        Response::success(array_map(function ($r) {
-            $features = json_decode($r['features'] ?? '[]', true);
-            return [
-                'id' => (int) $r['id'],
-                'name' => $r['name'],
-                'slug' => $r['slug'],
-                'price' => (float) $r['price'],
-                'currency' => $r['currency'],
-                'period' => $r['period'],
-                'monthlyCoins' => (int) $r['monthly_coins'],
-                'features' => is_array($features) ? $features : [],
-                'color' => $r['color'],
-                'isPopular' => (bool) $r['is_popular'],
-                'isBestValue' => (bool) $r['is_best_value'],
-                'isActive' => (bool) $r['is_active'],
-                'sortOrder' => (int) $r['sort_order'],
-            ];
-        }, $rows));
-    }
-
-    /** PUT /api/admin/subscription-plans/{id} */
-    public function updateSubscriptionPlan(string $id): void
-    {
-        AuthMiddleware::requireRole(['admin']);
-        $data = $this->body();
-        $pdo = Database::connection();
-
-        $stmt = $pdo->prepare("SELECT id FROM subscription_plans WHERE id = ?");
-        $stmt->execute([(int) $id]);
-        if (!$stmt->fetch()) {
-            Response::error('Subscription plan not found.', 404);
-        }
-
-        $fields = [];
-        $params = [];
-        if (array_key_exists('price', $data)) {
-            $fields[] = 'price = ?';
-            $params[] = (float) $data['price'];
-        }
-        if (array_key_exists('currency', $data)) {
-            $fields[] = 'currency = ?';
-            $params[] = strtoupper(trim((string) $data['currency']));
-        }
-        if (array_key_exists('monthlyCoins', $data)) {
-            $fields[] = 'monthly_coins = ?';
-            $params[] = (int) $data['monthlyCoins'];
-        }
-        if (array_key_exists('isActive', $data)) {
-            $fields[] = 'is_active = ?';
-            $params[] = $data['isActive'] ? 1 : 0;
-        }
-        if (array_key_exists('isPopular', $data)) {
-            $fields[] = 'is_popular = ?';
-            $params[] = $data['isPopular'] ? 1 : 0;
-        }
-        if (array_key_exists('isBestValue', $data)) {
-            $fields[] = 'is_best_value = ?';
-            $params[] = $data['isBestValue'] ? 1 : 0;
-        }
-        if (empty($fields)) {
-            Response::error('No fields to update.', 422);
-        }
-        $params[] = (int) $id;
-        $pdo->prepare('UPDATE subscription_plans SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
-        Response::success(null, 'Subscription plan updated.');
     }
 }
