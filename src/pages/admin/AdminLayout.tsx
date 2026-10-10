@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { BarChart2, BookOpen, Users, Tag, PenTool, Megaphone, Gift, Settings, Menu, X, Home, TrendingUp, MessageSquare, Bell } from 'lucide-react';
+import { BarChart2, BookOpen, Users, Tag, PenTool, Megaphone, Gift, Settings, Menu, X, Home, TrendingUp, MessageSquare, Bell, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAvatarUrl } from '../../lib/avatar';
 
@@ -16,6 +16,7 @@ const ADMIN_NAV = [
   { icon: Users, label: 'Users', to: '/admin/users' },
   { icon: Megaphone, label: 'Advertisements', to: '/admin/ads' },
   { icon: Gift, label: 'Rewards', to: '/admin/rewards' },
+  { icon: DollarSign, label: 'Pricing', to: '/admin/pricing' },
   { icon: TrendingUp, label: 'Analytics', to: '/admin/analytics' },
   { icon: Settings, label: 'Settings', to: '/settings' },
 ];
