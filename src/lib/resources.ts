@@ -91,9 +91,12 @@ export const userApi = {
   bookmarks: () => apiFetch<Novel[]>('/user/bookmarks'),
   addBookmark: (novelId: number) => apiFetch<null>(`/user/bookmarks/${novelId}`, { method: 'POST' }),
   removeBookmark: (novelId: number) => apiFetch<null>(`/user/bookmarks/${novelId}`, { method: 'DELETE' }),
-  notifications: (page = 1, perPage = 20) => apiFetchPaginated<Notification>('/user/notifications', { params: { page, per_page: perPage } }),
-  markNotificationRead: (id: number) => apiFetch<null>(`/user/notifications/${id}/read`, { method: 'PATCH' }),
-  markAllNotificationsRead: () => apiFetch<null>('/user/notifications/read-all', { method: 'PATCH' }),
+  notifications: (page = 1, perPage = 20) =>
+    apiFetchPaginated<Notification>('/user/notifications', { params: { page, per_page: perPage } }),
+  markNotificationRead: (id: number) =>
+    apiFetch<null>(`/user/notifications/${id}/read`, { method: 'PATCH' }),
+  markAllNotificationsRead: () =>
+    apiFetch<null>('/user/notifications/read-all', { method: 'PATCH' }),
 };
 
 export interface Tag {
@@ -168,7 +171,14 @@ export interface AdminNovelListItem {
   isFeatured: boolean;
   rating: number;
   views: number;
-  translations: { id: number; language: string; title: string; status: string; publishStatus: string; chaptersCount: number }[];
+  translations: {
+    id: number;
+    language: string;
+    title: string;
+    status: string;
+    publishStatus: string;
+    chaptersCount: number;
+  }[];
 }
 
 export interface AdminNovelDetail {
@@ -178,8 +188,15 @@ export interface AdminNovelDetail {
   isFeatured: boolean;
   genres: { id: number; name: string }[];
   translations: {
-    id: number; language: string; title: string; slug: string; cover: string | null;
-    synopsis: string; status: string; publishStatus: string; chaptersCount: number;
+    id: number;
+    language: string;
+    title: string;
+    slug: string;
+    cover: string | null;
+    synopsis: string;
+    status: string;
+    publishStatus: string;
+    chaptersCount: number;
   }[];
 }
 
@@ -210,7 +227,8 @@ export interface SubscriptionPlan {
 
 export const paymentsApi = {
   listCoinPackages: () => apiFetch<CoinPackage[]>('/payments/coin-packages', { skipAuth: true }),
-  listSubscriptionPlans: () => apiFetch<SubscriptionPlan[]>('/payments/subscription-plans', { skipAuth: true }),
+  listSubscriptionPlans: () =>
+    apiFetch<SubscriptionPlan[]>('/payments/subscription-plans', { skipAuth: true }),
   checkout: (data: { type: 'coin_package' | 'subscription'; id: number }) =>
     apiFetch<{ checkoutUrl: string; sessionId: string }>('/payments/checkout', {
       method: 'POST',
@@ -219,78 +237,189 @@ export const paymentsApi = {
 };
 
 export interface AdminChapterListItem {
-  id: number; number: number; title: string; wordCount: number; isPremium: boolean;
-  coinCost: number; publishStatus: string; publishedAt: string | null;
+  id: number;
+  number: number;
+  title: string;
+  wordCount: number;
+  isPremium: boolean;
+  coinCost: number;
+  publishStatus: string;
+  publishedAt: string | null;
 }
 
-export interface PenName { id: number; name: string; slug: string; bio: string | null; avatar: string | null }
+export interface PenName {
+  id: number;
+  name: string;
+  slug: string;
+  bio: string | null;
+  avatar: string | null;
+}
 
 export const adminApi = {
   listNovels: () => apiFetch<AdminNovelListItem[]>('/admin/novels'),
   showNovel: (id: number) => apiFetch<AdminNovelDetail>(`/admin/novels/${id}`),
   createNovel: (data: {
-    penNameId: number; language: string; title: string; synopsis: string;
-    cover?: string; status?: string; genreIds?: number[]; tagIds?: number[];
-  }) => apiFetch<{ novelId: number; translationId: number; slug: string }>('/admin/novels', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+    penNameId: number;
+    language: string;
+    title: string;
+    synopsis: string;
+    cover?: string;
+    status?: string;
+    genreIds?: number[];
+    tagIds?: number[];
+  }) =>
+    apiFetch<{ novelId: number; translationId: number; slug: string }>('/admin/novels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   deleteNovel: (id: number) =>
     apiFetch<null>(`/admin/novels/${id}`, { method: 'DELETE' }),
-  addTranslation: (novelId: number, data: { language: string; title: string; synopsis: string; cover?: string; status?: string }) =>
-    apiFetch<{ translationId: number }>(`/admin/novels/${novelId}/translations`, { method: 'POST', body: JSON.stringify(data) }),
+  addTranslation: (
+    novelId: number,
+    data: { language: string; title: string; synopsis: string; cover?: string; status?: string }
+  ) =>
+    apiFetch<{ translationId: number }>(`/admin/novels/${novelId}/translations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   updateTranslation: (translationId: number, data: Record<string, unknown>) =>
-    apiFetch<null>(`/admin/translations/${translationId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch<null>(`/admin/translations/${translationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 
-  listChapters: (translationId: number) => apiFetch<AdminChapterListItem[]>(`/admin/translations/${translationId}/chapters`),
-  createChapter: (translationId: number, data: {
-    number: number; title: string; content: string; isPremium?: boolean; coinCost?: number;
-    publishStatus?: string; publishedAt?: string | null;
-  }) => apiFetch<{ chapterId: number }>(`/admin/translations/${translationId}/chapters`, { method: 'POST', body: JSON.stringify(data) }),
+  listChapters: (translationId: number) =>
+    apiFetch<AdminChapterListItem[]>(`/admin/translations/${translationId}/chapters`),
+  createChapter: (
+    translationId: number,
+    data: {
+      number: number;
+      title: string;
+      content: string;
+      isPremium?: boolean;
+      coinCost?: number;
+      publishStatus?: string;
+      publishedAt?: string | null;
+    }
+  ) =>
+    apiFetch<{ chapterId: number }>(`/admin/translations/${translationId}/chapters`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   updateChapter: (chapterId: number, data: Record<string, unknown>) =>
-    apiFetch<null>(`/admin/chapters/${chapterId}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteChapter: (chapterId: number) => apiFetch<null>(`/admin/chapters/${chapterId}`, { method: 'DELETE' }),
+    apiFetch<null>(`/admin/chapters/${chapterId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteChapter: (chapterId: number) =>
+    apiFetch<null>(`/admin/chapters/${chapterId}`, { method: 'DELETE' }),
+
+  importManuscript: (
+    translationId: number,
+    file: File,
+    options?: {
+      publishStatus?: string;
+      isPremium?: boolean;
+      coinCost?: number;
+      startNumber?: number;
+    }
+  ) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (options?.publishStatus) form.append('publishStatus', options.publishStatus);
+    if (options?.isPremium) form.append('isPremium', '1');
+    if (options?.coinCost != null) form.append('coinCost', String(options.coinCost));
+    if (options?.startNumber != null) form.append('startNumber', String(options.startNumber));
+    return apiFetch<{
+      createdCount: number;
+      chapters: { chapterId: number; number: number; title: string }[];
+    }>(`/admin/translations/${translationId}/chapters/manuscript`, {
+      method: 'POST',
+      body: form,
+    });
+  },
 
   listPenNames: () => apiFetch<PenName[]>('/admin/pen-names'),
   createPenName: (data: { name: string; bio?: string; avatar?: string }) =>
-    apiFetch<{ id: number; name: string; slug: string }>('/admin/pen-names', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch<{ id: number; name: string; slug: string }>('/admin/pen-names', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   listAdminCoinPackages: () =>
-    apiFetch<{
-      id: number; coins: number; price: number; currency: string; bonus: number;
-      isPopular: boolean; isBestValue: boolean; image: string | null; isActive: boolean; sortOrder: number;
-    }[]>('/admin/coin-packages'),
+    apiFetch<
+      {
+        id: number;
+        coins: number;
+        price: number;
+        currency: string;
+        bonus: number;
+        isPopular: boolean;
+        isBestValue: boolean;
+        image: string | null;
+        isActive: boolean;
+        sortOrder: number;
+      }[]
+    >('/admin/coin-packages'),
 
   updateCoinPackage: (id: number, data: Record<string, unknown>) =>
-    apiFetch<null>(`/admin/coin-packages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch<null>(`/admin/coin-packages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 
   listAdminSubscriptionPlans: () =>
-    apiFetch<{
-      id: number; name: string; slug: string; price: number; currency: string; period: string;
-      monthlyCoins: number; features: string[]; color: string | null;
-      isPopular: boolean; isBestValue: boolean; isActive: boolean; sortOrder: number;
-    }[]>('/admin/subscription-plans'),
+    apiFetch<
+      {
+        id: number;
+        name: string;
+        slug: string;
+        price: number;
+        currency: string;
+        period: string;
+        monthlyCoins: number;
+        features: string[];
+        color: string | null;
+        isPopular: boolean;
+        isBestValue: boolean;
+        isActive: boolean;
+        sortOrder: number;
+      }[]
+    >('/admin/subscription-plans'),
 
   updateSubscriptionPlan: (id: number, data: Record<string, unknown>) =>
-    apiFetch<null>(`/admin/subscription-plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch<null>(`/admin/subscription-plans/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 
   listTags: () => apiFetch<Tag[]>('/admin/tags'),
   createTag: (data: { name: string }) =>
     apiFetch<Tag>('/admin/tags', { method: 'POST', body: JSON.stringify(data) }),
-  stats: () => apiFetch<{
-    totalUsers: number;
-    totalNovels: number;
-    totalChapters: number;
-    publishedChapters: number;
-    totalReads: number;
-    revenue: number;
-  }>('/admin/stats'),
+  stats: () =>
+    apiFetch<{
+      totalUsers: number;
+      totalNovels: number;
+      totalChapters: number;
+      publishedChapters: number;
+      totalReads: number;
+      revenue: number;
+    }>('/admin/stats'),
 
-  broadcastNotification: (data: { title: string; message: string; audience?: 'all' | 'subscribers' }) =>
-    apiFetch<{ recipientCount: number }>('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) }),
+  broadcastNotification: (data: {
+    title: string;
+    message: string;
+    audience?: 'all' | 'subscribers';
+  }) =>
+    apiFetch<{ recipientCount: number }>('/admin/notifications/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   listComments: (novelIdOrSlug: string | number, page = 1, perPage = 20) =>
-    apiFetchPaginated<CommentItem>(`/novels/${novelIdOrSlug}/comments`, { params: { page, per_page: perPage } }),
+    apiFetchPaginated<CommentItem>(`/novels/${novelIdOrSlug}/comments`, {
+      params: { page, per_page: perPage },
+    }),
 
   deleteComment: (commentId: number) =>
     apiFetch<null>(`/comments/${commentId}`, { method: 'DELETE' }),
