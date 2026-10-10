@@ -40,6 +40,7 @@ import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminTags from './pages/admin/AdminTags';
 import AdminComments from './pages/admin/AdminComments';
 import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminPricing from './pages/admin/AdminPricing';
 
 export default function App() {
   return (
@@ -72,6 +73,7 @@ export default function App() {
                 <Route path="ads" element={<AdminAds />} />
                 <Route path="rewards" element={<AdminRewards />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
+                <Route path="pricing" element={<AdminPricing />} />
               </Route>
 
               {/* Main App Layout */}
