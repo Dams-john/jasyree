@@ -255,6 +255,25 @@ export const adminApi = {
   createPenName: (data: { name: string; bio?: string; avatar?: string }) =>
     apiFetch<{ id: number; name: string; slug: string }>('/admin/pen-names', { method: 'POST', body: JSON.stringify(data) }),
 
+  listAdminCoinPackages: () =>
+    apiFetch<{
+      id: number; coins: number; price: number; currency: string; bonus: number;
+      isPopular: boolean; isBestValue: boolean; image: string | null; isActive: boolean; sortOrder: number;
+    }[]>('/admin/coin-packages'),
+
+  updateCoinPackage: (id: number, data: Record<string, unknown>) =>
+    apiFetch<null>(`/admin/coin-packages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  listAdminSubscriptionPlans: () =>
+    apiFetch<{
+      id: number; name: string; slug: string; price: number; currency: string; period: string;
+      monthlyCoins: number; features: string[]; color: string | null;
+      isPopular: boolean; isBestValue: boolean; isActive: boolean; sortOrder: number;
+    }[]>('/admin/subscription-plans'),
+
+  updateSubscriptionPlan: (id: number, data: Record<string, unknown>) =>
+    apiFetch<null>(`/admin/subscription-plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
   listTags: () => apiFetch<Tag[]>('/admin/tags'),
   createTag: (data: { name: string }) =>
     apiFetch<Tag>('/admin/tags', { method: 'POST', body: JSON.stringify(data) }),
