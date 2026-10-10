@@ -854,4 +854,160 @@ class AdminController
         }
         return $chapter;
     }
+    // ============================================================
+    // PRICING (admin)
+    // ============================================================
+
+    /** GET /api/admin/coin-packages */
+    public function listCoinPackages(): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $pdo = Database::connection();
+        $rows = $pdo->query("
+            SELECT id, coins, price, currency, bonus, is_popular, is_best_value, image, is_active, sort_order
+            FROM coin_packages ORDER BY sort_order ASC, id ASC
+        ")->fetchAll();
+
+        Response::success(array_map(fn($r) => [
+            'id' => (int) $r['id'],
+            'coins' => (int) $r['coins'],
+            'price' => (float) $r['price'],
+            'currency' => $r['currency'],
+            'bonus' => (int) $r['bonus'],
+            'isPopular' => (bool) $r['is_popular'],
+            'isBestValue' => (bool) $r['is_best_value'],
+            'image' => $r['image'],
+            'isActive' => (bool) $r['is_active'],
+            'sortOrder' => (int) $r['sort_order'],
+        ], $rows));
+    }
+
+    /** PUT /api/admin/coin-packages/{id} */
+    public function updateCoinPackage(string $id): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare("SELECT id FROM coin_packages WHERE id = ?");
+        $stmt->execute([(int) $id]);
+        if (!$stmt->fetch()) {
+            Response::error('Coin package not found.', 404);
+        }
+
+        $fields = [];
+        $params = [];
+        if (array_key_exists('price', $data)) {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['price'];
+        }
+        if (array_key_exists('currency', $data)) {
+            $fields[] = 'currency = ?';
+            $params[] = strtoupper(trim((string) $data['currency']));
+        }
+        if (array_key_exists('coins', $data)) {
+            $fields[] = 'coins = ?';
+            $params[] = (int) $data['coins'];
+        }
+        if (array_key_exists('bonus', $data)) {
+            $fields[] = 'bonus = ?';
+            $params[] = (int) $data['bonus'];
+        }
+        if (array_key_exists('isActive', $data)) {
+            $fields[] = 'is_active = ?';
+            $params[] = $data['isActive'] ? 1 : 0;
+        }
+        if (array_key_exists('isPopular', $data)) {
+            $fields[] = 'is_popular = ?';
+            $params[] = $data['isPopular'] ? 1 : 0;
+        }
+        if (array_key_exists('isBestValue', $data)) {
+            $fields[] = 'is_best_value = ?';
+            $params[] = $data['isBestValue'] ? 1 : 0;
+        }
+        if (empty($fields)) {
+            Response::error('No fields to update.', 422);
+        }
+        $params[] = (int) $id;
+        $pdo->prepare('UPDATE coin_packages SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'Coin package updated.');
+    }
+
+    /** GET /api/admin/subscription-plans */
+    public function listSubscriptionPlans(): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $pdo = Database::connection();
+        $rows = $pdo->query("
+            SELECT id, name, slug, price, currency, period, monthly_coins, features, color,
+                   is_popular, is_best_value, is_active, sort_order
+            FROM subscription_plans ORDER BY sort_order ASC, id ASC
+        ")->fetchAll();
+
+        Response::success(array_map(function ($r) {
+            $features = json_decode($r['features'] ?? '[]', true);
+            return [
+                'id' => (int) $r['id'],
+                'name' => $r['name'],
+                'slug' => $r['slug'],
+                'price' => (float) $r['price'],
+                'currency' => $r['currency'],
+                'period' => $r['period'],
+                'monthlyCoins' => (int) $r['monthly_coins'],
+                'features' => is_array($features) ? $features : [],
+                'color' => $r['color'],
+                'isPopular' => (bool) $r['is_popular'],
+                'isBestValue' => (bool) $r['is_best_value'],
+                'isActive' => (bool) $r['is_active'],
+                'sortOrder' => (int) $r['sort_order'],
+            ];
+        }, $rows));
+    }
+
+    /** PUT /api/admin/subscription-plans/{id} */
+    public function updateSubscriptionPlan(string $id): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare("SELECT id FROM subscription_plans WHERE id = ?");
+        $stmt->execute([(int) $id]);
+        if (!$stmt->fetch()) {
+            Response::error('Subscription plan not found.', 404);
+        }
+
+        $fields = [];
+        $params = [];
+        if (array_key_exists('price', $data)) {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['price'];
+        }
+        if (array_key_exists('currency', $data)) {
+            $fields[] = 'currency = ?';
+            $params[] = strtoupper(trim((string) $data['currency']));
+        }
+        if (array_key_exists('monthlyCoins', $data)) {
+            $fields[] = 'monthly_coins = ?';
+            $params[] = (int) $data['monthlyCoins'];
+        }
+        if (array_key_exists('isActive', $data)) {
+            $fields[] = 'is_active = ?';
+            $params[] = $data['isActive'] ? 1 : 0;
+        }
+        if (array_key_exists('isPopular', $data)) {
+            $fields[] = 'is_popular = ?';
+            $params[] = $data['isPopular'] ? 1 : 0;
+        }
+        if (array_key_exists('isBestValue', $data)) {
+            $fields[] = 'is_best_value = ?';
+            $params[] = $data['isBestValue'] ? 1 : 0;
+        }
+        if (empty($fields)) {
+            Response::error('No fields to update.', 422);
+        }
+        $params[] = (int) $id;
+        $pdo->prepare('UPDATE subscription_plans SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'Subscription plan updated.');
+    }
 }
