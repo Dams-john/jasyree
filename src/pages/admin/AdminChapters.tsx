@@ -47,13 +47,7 @@ export default function AdminChapters() {
   useEffect(() => {
     if (!selectedNovelId) return;
     setLoading(true);
-    setUploadMsg(
-  'Imported ' +
-    res.createdCount +
-    ' chapter' +
-    (res.createdCount === 1 ? '' : 's') +
-    ' as draft.'
-);
+    setUploadMsg('');
     adminApi.showNovel(selectedNovelId).then(setNovelDetail).catch(() => {});
   }, [selectedNovelId]);
 
