@@ -19,7 +19,6 @@ class AdminController
     // NOVELS
     // ============================================================
 
-    /** GET /api/admin/novels */
     public function listNovels(): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -78,7 +77,6 @@ class AdminController
         ], $novels));
     }
 
-    /** GET /api/admin/novels/{id} */
     public function showNovel(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -111,7 +109,6 @@ class AdminController
         ]);
     }
 
-    /** POST /api/admin/novels */
     public function createNovel(): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -135,7 +132,6 @@ class AdminController
             $stmt = $pdo->prepare("INSERT INTO novels (pen_name_id, slug) VALUES (?, ?)");
             $stmt->execute([$data['penNameId'], $slug]);
             $novelId = (int) $pdo->lastInsertId();
-
             $translationId = $this->insertTranslation($novelId, $data);
 
             if (!empty($data['genreIds']) && is_array($data['genreIds'])) {
@@ -154,7 +150,6 @@ class AdminController
         Response::success(['novelId' => $novelId, 'translationId' => $translationId, 'slug' => $slug], 'Novel created.', 201);
     }
 
-    /** DELETE /api/admin/novels/{id} */
     public function deleteNovel(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -177,7 +172,6 @@ class AdminController
             $pdo->prepare("DELETE FROM novel_tags WHERE novel_id = ?")->execute([$novel['id']]);
             $pdo->prepare("DELETE FROM novel_genres WHERE novel_id = ?")->execute([$novel['id']]);
             $pdo->prepare("DELETE FROM novels WHERE id = ?")->execute([$novel['id']]);
-
             $pdo->commit();
         } catch (\Throwable $e) {
             $pdo->rollBack();
@@ -187,7 +181,6 @@ class AdminController
         Response::success(null, 'Novel deleted.');
     }
 
-    /** POST /api/admin/novels/{id}/translations */
     public function addTranslation(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -211,7 +204,6 @@ class AdminController
         Response::success(['translationId' => $translationId], 'Language edition added.', 201);
     }
 
-    /** PUT /api/admin/translations/{id} */
     public function updateTranslation(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -246,7 +238,6 @@ class AdminController
         $pdo = Database::connection();
         $stmt = $pdo->prepare("UPDATE novel_translations SET " . implode(', ', $fields) . " WHERE id = ?");
         $stmt->execute($params);
-
         Response::success(null, 'Translation updated.');
     }
 
@@ -254,7 +245,6 @@ class AdminController
     // CHAPTERS
     // ============================================================
 
-    /** GET /api/admin/translations/{id}/chapters */
     public function listChapters(string $translationId): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -282,11 +272,7 @@ class AdminController
         }, $stmt->fetchAll()));
     }
 
-    /**
-     * POST /api/admin/translations/{id}/chapters/manuscript
-     * Multipart: file (.docx or .txt)
-     * Optional POST fields: publishStatus, isPremium, coinCost, startNumber
-     */
+    /** POST multipart: file (.docx|.txt), optional publishStatus, isPremium, coinCost, startNumber */
     public function importManuscript(string $translationId): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -322,7 +308,6 @@ class AdminController
         }
 
         $pdo = Database::connection();
-
         $maxStmt = $pdo->prepare("SELECT COALESCE(MAX(number), 0) AS m FROM chapters WHERE novel_translation_id = ?");
         $maxStmt->execute([$translation['id']]);
         $maxNum = (int) $maxStmt->fetch()['m'];
@@ -403,11 +388,11 @@ class AdminController
         return trim($text);
     }
 
-    /** Split on lines like "Chapter 1", "CHAPTER 12: Title", "Ch. 3 - Name" */
     private function splitManuscriptIntoChapters(string $text): array
     {
         $lines = explode("\n", $text);
-        \( pattern = '/^(chapter|ch\.?)\s*(\d+)\s*([:.\-\x{2013}\x{2014}]\s*(.+))? \)/iu';
+        // Simple pattern only — no unicode escapes (those caused the live parse error)
+        \( pattern = '/^(chapter|ch\.?)\s*(\d+)(?:\s*[:.\-]\s*(.+))? \)/i';
 
         $chapters = [];
         $currentTitle = '';
@@ -424,7 +409,7 @@ class AdminController
                         'content' => trim(implode("\n", $currentBody)),
                     ];
                 }
-                $extra = isset($m[4]) ? trim($m[4]) : '';
+                $extra = isset($m[3]) ? trim($m[3]) : '';
                 $currentTitle = $extra !== ''
                     ? ('Chapter ' . $m[2] . ': ' . $extra)
                     : ('Chapter ' . $m[2]);
@@ -449,7 +434,6 @@ class AdminController
         ));
     }
 
-    /** POST /api/admin/translations/{id}/chapters */
     public function createChapter(string $translationId): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -500,7 +484,6 @@ class AdminController
         Response::success(['chapterId' => $chapterId], 'Chapter created.', 201);
     }
 
-    /** PUT /api/admin/chapters/{id} */
     public function updateChapter(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -548,7 +531,6 @@ class AdminController
 
         $wasLive = $chapter['publish_status'] === 'published'
             && $chapter['published_at'] && strtotime($chapter['published_at']) <= time();
-
         $newPublishStatus = $data['publishStatus'] ?? $chapter['publish_status'];
         $newPublishedAt = array_key_exists('publishedAt', $data) ? $data['publishedAt'] : $chapter['published_at'];
         $isLiveNow = $newPublishStatus === 'published' && $newPublishedAt && strtotime($newPublishedAt) <= time();
@@ -558,11 +540,9 @@ class AdminController
         }
 
         $this->recalcChaptersCount((int) $chapter['novel_translation_id']);
-
         Response::success(null, 'Chapter updated.');
     }
 
-    /** DELETE /api/admin/chapters/{id} */
     public function deleteChapter(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -571,9 +551,7 @@ class AdminController
         $pdo = Database::connection();
         $stmt = $pdo->prepare("DELETE FROM chapters WHERE id = ?");
         $stmt->execute([$chapter['id']]);
-
         $this->recalcChaptersCount((int) $chapter['novel_translation_id']);
-
         Response::success(null, 'Chapter deleted.');
     }
 
@@ -581,7 +559,6 @@ class AdminController
     // GENRES / TAGS
     // ============================================================
 
-    /** POST /api/admin/genres */
     public function createGenre(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -600,7 +577,6 @@ class AdminController
         }
 
         $slug = $this->uniqueSlug('genres', $this->slugify($data['name']));
-
         $stmt = $pdo->prepare("INSERT INTO genres (name, slug, icon, color, cover) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([
             trim($data['name']),
@@ -617,7 +593,6 @@ class AdminController
         ], 'Genre created.', 201);
     }
 
-    /** GET /api/admin/tags */
     public function listTags(): void
     {
         AuthMiddleware::requireRole(['author', 'admin']);
@@ -637,7 +612,6 @@ class AdminController
         ], $stmt->fetchAll()));
     }
 
-    /** POST /api/admin/tags */
     public function createTag(): void
     {
         AuthMiddleware::requireRole(['admin', 'author']);
@@ -669,10 +643,9 @@ class AdminController
     }
 
     // ============================================================
-    // DASHBOARD STATISTICS
+    // STATS / NOTIFICATIONS / REWARDS
     // ============================================================
 
-    /** GET /api/admin/stats */
     public function stats(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -717,11 +690,6 @@ class AdminController
         ]);
     }
 
-    // ============================================================
-    // NOTIFICATIONS / REWARDS
-    // ============================================================
-
-    /** POST /api/admin/notifications/broadcast */
     public function broadcastNotification(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -740,11 +708,9 @@ class AdminController
         };
 
         Notification::createBulk($userIds, 'promo', $data['title'], $data['message']);
-
         Response::success(['recipientCount' => count($userIds)], 'Promotion sent.', 201);
     }
 
-    /** POST /api/admin/users/{userId}/reward-coins */
     public function rewardCoins(string $userId): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -769,15 +735,11 @@ class AdminController
 
         $pdo->beginTransaction();
         try {
-            $updateStmt = $pdo->prepare("UPDATE users SET coins = ? WHERE id = ?");
-            $updateStmt->execute([$newBalance, $userId]);
-
-            $txStmt = $pdo->prepare("
+            $pdo->prepare("UPDATE users SET coins = ? WHERE id = ?")->execute([$newBalance, $userId]);
+            $pdo->prepare("
                 INSERT INTO coin_transactions (user_id, type, description, amount, balance_after, reference_type)
                 VALUES (?, 'reward', ?, ?, ?, 'admin_reward')
-            ");
-            $txStmt->execute([$userId, $description, $amount, $newBalance]);
-
+            ")->execute([$userId, $description, $amount, $newBalance]);
             $pdo->commit();
         } catch (Throwable $e) {
             $pdo->rollBack();
@@ -790,11 +752,9 @@ class AdminController
             'You received a coin reward!',
             "{$description} — +{$amount} coins added to your wallet."
         );
-
         Response::success(['newBalance' => $newBalance], 'Coins granted.');
     }
 
-    /** POST /api/admin/users/{userId}/subscription */
     public function grantSubscription(string $userId): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -820,11 +780,10 @@ class AdminController
             ->execute([$userId]);
 
         $periodEnd = date('Y-m-d H:i:s', time() + ((int) $data['days'] * 86400));
-        $insertStmt = $pdo->prepare("
+        $pdo->prepare("
             INSERT INTO user_subscriptions (user_id, plan_id, status, current_period_end)
             VALUES (?, ?, 'active', ?)
-        ");
-        $insertStmt->execute([$userId, $plan['id'], $periodEnd]);
+        ")->execute([$userId, $plan['id'], $periodEnd]);
 
         Notification::create(
             (int) $userId,
@@ -832,7 +791,6 @@ class AdminController
             'Your subscription was updated',
             "You now have {$plan['name']} access until " . date('M j, Y', strtotime($periodEnd)) . "."
         );
-
         Response::success(['plan' => $plan['name'], 'expiresAt' => $periodEnd], 'Subscription granted.');
     }
 
@@ -840,7 +798,6 @@ class AdminController
     // PRICING
     // ============================================================
 
-    /** GET /api/admin/coin-packages */
     public function listCoinPackages(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -864,7 +821,6 @@ class AdminController
         ], $rows));
     }
 
-    /** PUT /api/admin/coin-packages/{id} */
     public function updateCoinPackage(string $id): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -915,7 +871,6 @@ class AdminController
         Response::success(null, 'Coin package updated.');
     }
 
-    /** GET /api/admin/subscription-plans */
     public function listSubscriptionPlans(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -946,7 +901,6 @@ class AdminController
         }, $rows));
     }
 
-    /** PUT /api/admin/subscription-plans/{id} */
     public function updateSubscriptionPlan(string $id): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -1026,7 +980,6 @@ class AdminController
     {
         $pdo = Database::connection();
         $slug = $this->uniqueSlug('novel_translations', $this->slugify($data['title']));
-
         $stmt = $pdo->prepare("
             INSERT INTO novel_translations (novel_id, language, title, slug, cover, synopsis, status, publish_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'draft')
@@ -1059,8 +1012,7 @@ class AdminController
     private function syncGenres(int $novelId, array $genreIds): void
     {
         $pdo = Database::connection();
-        $del = $pdo->prepare("DELETE FROM novel_genres WHERE novel_id = ?");
-        $del->execute([$novelId]);
+        $pdo->prepare("DELETE FROM novel_genres WHERE novel_id = ?")->execute([$novelId]);
         $ins = $pdo->prepare("INSERT INTO novel_genres (novel_id, genre_id) VALUES (?, ?)");
         foreach ($genreIds as $genreId) {
             $ins->execute([$novelId, (int) $genreId]);
@@ -1070,8 +1022,7 @@ class AdminController
     private function syncTags(int $novelId, array $tagIds): void
     {
         $pdo = Database::connection();
-        $del = $pdo->prepare("DELETE FROM novel_tags WHERE novel_id = ?");
-        $del->execute([$novelId]);
+        $pdo->prepare("DELETE FROM novel_tags WHERE novel_id = ?")->execute([$novelId]);
         $ins = $pdo->prepare("INSERT INTO novel_tags (novel_id, tag_id) VALUES (?, ?)");
         foreach ($tagIds as $tagId) {
             $ins->execute([$novelId, (int) $tagId]);
