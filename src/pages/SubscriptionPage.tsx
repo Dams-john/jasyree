@@ -27,7 +27,8 @@ export default function SubscriptionPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    paymentsApi.listSubscriptionPlans()
+    paymentsApi
+      .listSubscriptionPlans()
       .then(data => setPlans(data || []))
       .catch(err => setError(err instanceof ApiError ? err.message : 'Failed to load plans.'))
       .finally(() => setLoading(false));
@@ -67,7 +68,9 @@ export default function SubscriptionPage() {
         {user && (
           <div className="inline-flex items-center gap-2 mt-3 px-4 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full text-sm">
             <span className="text-gray-500 dark:text-gray-400">Current plan:</span>
-            <span className="font-semibold text-gray-900 dark:text-white capitalize">{user.subscription}</span>
+            <span className="font-semibold text-gray-900 dark:text-white capitalize">
+              {user.subscription}
+            </span>
           </div>
         )}
       </div>
@@ -90,6 +93,12 @@ export default function SubscriptionPage() {
             const Icon = PLAN_ICONS[plan.name] || Star;
             const gradient = PLAN_GRADIENTS[plan.name] || 'from-gray-300 to-gray-400';
             const isBestValue = plan.isBestValue;
+            const features = (plan.features || []).map((feature: string) =>
+              /coin/i.test(feature) && plan.monthlyCoins > 0
+                ? plan.monthlyCoins + ' Coins Monthly'
+                : feature
+            );
+
             return (
               <div
                 key={plan.id}
@@ -105,11 +114,16 @@ export default function SubscriptionPage() {
                   </div>
                 )}
 
-                <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg`}>
+                <div
+                  className={`w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg`}
+                >
                   <Icon className="w-7 h-7 text-white" />
                 </div>
 
-                <h3 className="text-xl font-black text-center mb-1" style={{ color: plan.color || undefined }}>
+                <h3
+                  className="text-xl font-black text-center mb-1"
+                  style={{ color: plan.color || undefined }}
+                >
                   {plan.name}
                 </h3>
 
@@ -129,8 +143,11 @@ export default function SubscriptionPage() {
                 )}
 
                 <ul className="space-y-2.5 mb-6 flex-1">
-                  {(plan.features || []).map(feature => (
-                    <li key={feature} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  {features.map((feature: string) => (
+                    <li
+                      key={feature}
+                      className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                    >
                       <div
                         className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
                           isBestValue ? 'bg-[#e91e8c]' : 'bg-emerald-500'
@@ -159,7 +176,7 @@ export default function SubscriptionPage() {
                       Redirecting…
                     </>
                   ) : (
-                    `Choose ${plan.name}`
+                    'Choose ' + plan.name
                   )}
                 </button>
               </div>
@@ -177,4 +194,4 @@ export default function SubscriptionPage() {
       </div>
     </div>
   );
-}
+                  }
