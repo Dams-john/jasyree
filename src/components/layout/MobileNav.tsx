@@ -14,7 +14,6 @@ export default function MobileNav() {
       to: '/wallet',
       custom: true,
     },
-    { icon: Gift, label: t.rewards, to: '/rewards' },
     { icon: User, label: t.profile, to: '/profile' },
   ];
 
