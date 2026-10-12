@@ -88,7 +88,7 @@ export default function App() {
                 <Route path="/wallet" element={<WalletPage />} />
                 <Route path="/buy-coins" element={<BuyCoinsPage />} />
                 <Route path="/subscription" element={<SubscriptionPage />} />
-                <Route path="/rewards" element={<RewardsPage />} />
+                <Route path="/rewards" element={<Navigate to="/" replace />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
