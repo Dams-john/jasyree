@@ -392,7 +392,7 @@ class AdminController
     {
         $lines = explode("\n", $text);
         // Simple pattern only — no unicode escapes (those caused the live parse error)
-        \( pattern = '/^(chapter|ch\.?)\s*(\d+)(?:\s*[:.\-]\s*(.+))? \)/i';
+        $pattern = '/(chapter|ch\.?)\s*(\d+)(?:\s*[:.\-]\s*(.+))?$/i';
 
         $chapters = [];
         $currentTitle = '';
