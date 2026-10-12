@@ -105,7 +105,13 @@ export default function AdminChapters() {
       const res = await adminApi.importManuscript(translationId, file, {
         publishStatus: 'draft',
       });
-      setUploadMsg(`Imported \( {res.createdCount} chapter \){res.createdCount === 1 ? '' : 's'} as draft.`);
+      setUploadMsg(
+        'Imported ' +
+          String(res.createdCount) +
+          ' chapter' +
+          (res.createdCount === 1 ? '' : 's') +
+          ' as draft.'
+      );
       loadChapters();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Upload failed.');
