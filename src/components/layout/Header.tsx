@@ -24,7 +24,6 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     { label: t.home, to: '/' },
     { label: t.genres, to: '/genres' },
     { label: 'Ranking', to: '/ranking' },
-    { label: t.rewards, to: '/rewards' },
     { label: t.community, to: '/comments' },
   ];
 
