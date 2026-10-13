@@ -399,8 +399,14 @@ class AdminController
     private function splitManuscriptIntoChapters(string $text): array
     {
         $lines = explode("\n", $text);
-        // Simple pattern only — no unicode escapes (those caused the live parse error)
-        $pattern = '/(chapter|ch\.?)\s*(\d+)(?:\s*[:.\-]\s*(.+))?$/i';
+        $wordMap = [
+            'one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5,
+            'six' => 6, 'seven' => 7, 'eight' => 8, 'nine' => 9, 'ten' => 10,
+            'eleven' => 11, 'twelve' => 12, 'thirteen' => 13, 'fourteen' => 14, 'fifteen' => 15,
+            'sixteen' => 16, 'seventeen' => 17, 'eighteen' => 18, 'nineteen' => 19, 'twenty' => 20,
+            'thirty' => 30, 'forty' => 40, 'fifty' => 50, 'sixty' => 60, 'seventy' => 70,
+            'eighty' => 80, 'ninety' => 90,
+        ];
 
         $chapters = [];
         $currentTitle = '';
@@ -409,11 +415,35 @@ class AdminController
 
         foreach ($lines as $line) {
             $trim = trim($line);
-            if (mb_strlen($trim) > 120) {
+            if ($trim === '' || mb_strlen($trim) > 120) {
                 $currentBody[] = $line;
                 continue;
             }
-            if (preg_match($pattern, $trim, $m)) {
+
+            $num = null;
+            $extra = '';
+
+            if (preg_match('/^(chapter|ch\.?)\s*(\d+)\s*(?:[:.\-]\s*(.+))?$/iu', $trim, $m)) {
+                $num = (int) $m[2];
+                $extra = isset($m[3]) ? trim($m[3]) : '';
+            } elseif (preg_match('/^(chapter|ch\.?)\s+([a-z]+(?:[-\s][a-z]+)?)\s*(?:[:.\-]\s*(.+))?$/iu', $trim, $m)) {
+                $w = strtolower(str_replace('-', ' ', $m[2]));
+                $parts = preg_split('/\s+/', $w);
+                $n = 0;
+                foreach ($parts as $p) {
+                    if (!isset($wordMap[$p])) {
+                        $n = 0;
+                        break;
+                    }
+                    $n += $wordMap[$p];
+                }
+                if ($n > 0) {
+                    $num = $n;
+                    $extra = isset($m[3]) ? trim($m[3]) : '';
+                }
+            }
+
+            if ($num !== null) {
                 $foundHeading = true;
                 if ($currentTitle !== '') {
                     $chapters[] = [
@@ -421,10 +451,12 @@ class AdminController
                         'content' => trim(implode("\n", $currentBody)),
                     ];
                 }
-                $extra = isset($m[3]) ? trim($m[3]) : '';
                 $currentTitle = $extra !== ''
-                    ? ('Chapter ' . $m[2] . ': ' . $extra)
-                    : ('Chapter ' . $m[2]);
+                    ? ('Chapter ' . $num . ': ' . $extra)
+                    : ('Chapter ' . $num);
+                if (mb_strlen($currentTitle) > 200) {
+                    $currentTitle = mb_substr($currentTitle, 0, 197) . '...';
+                }
                 $currentBody = [];
             } else {
                 $currentBody[] = $line;
@@ -445,7 +477,7 @@ class AdminController
             static fn(array $c): bool => trim($c['content']) !== ''
         ));
     }
-
+    
     public function createChapter(string $translationId): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
