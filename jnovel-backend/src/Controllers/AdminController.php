@@ -333,6 +333,9 @@ class AdminController
                     continue;
                 }
                 $title = $ch['title'] !== '' ? $ch['title'] : ('Chapter ' . $number);
+                if (mb_strlen($title) > 200) {
+                    $title = mb_substr($title, 0, 197) . '...';
+                }
                 $wordCount = str_word_count(strip_tags($content));
                 $ins->execute([
                     $translation['id'],
