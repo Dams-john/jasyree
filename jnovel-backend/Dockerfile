@@ -1,11 +1,14 @@
-# force-rebuild 2026-10-05-tags-delete
+# force-rebuild 2026-10-13-zip-utf8
 FROM php:8.2-apache
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
-RUN docker-php-ext-install mysqli pdo pdo_mysql \
-	&& apt-get update \
-	&& apt-get install -y --no-install-recommends curl \
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends \
+		curl \
+		libzip-dev \
+		unzip \
+	&& docker-php-ext-install mysqli pdo pdo_mysql zip \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& a2enmod rewrite headers \
 	&& sed -ri -e "s!/var/www/html!${APACHE_DOCUMENT_ROOT}!g" \
