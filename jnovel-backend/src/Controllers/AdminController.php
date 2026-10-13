@@ -409,6 +409,10 @@ class AdminController
 
         foreach ($lines as $line) {
             $trim = trim($line);
+            if (mb_strlen($trim) > 120) {
+                $currentBody[] = $line;
+                continue;
+            }
             if (preg_match($pattern, $trim, $m)) {
                 $foundHeading = true;
                 if ($currentTitle !== '') {
