@@ -292,7 +292,12 @@ class AdminController
         if (str_ends_with($name, '.docx')) {
             $text = $this->extractTextFromDocx($tmp);
         } elseif (str_ends_with($name, '.txt')) {
-            $text = file_get_contents($tmp) ?: '';
+            $raw = file_get_contents($tmp) ?: '';
+            if (strncmp($raw, "\xEF\xBB\xBF", 3) === 0) {
+                $raw = substr($raw, 3);
+            }
+            $enc = mb_detect_encoding($raw, ['UTF-8', 'Windows-1252', 'ISO-8859-1'], true) ?: 'Windows-1252';
+            $text = $enc === 'UTF-8' ? $raw : mb_convert_encoding($raw, 'UTF-8', $enc);
         } else {
             Response::error('Only .docx or .txt files are supported.', 422);
         }
