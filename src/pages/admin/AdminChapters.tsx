@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Lock, Unlock, Upload } from 'lucide-react';
+import { Plus, Trash2, Lock, Unlock, Upload, Pencil } from 'lucide-react';
 import { adminApi, AdminNovelListItem, AdminNovelDetail, AdminChapterListItem } from '../../lib/resources';
 import { ApiError } from '../../lib/api';
 
@@ -20,6 +20,15 @@ export default function AdminChapters() {
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
+
+  // Edit modal
+  const [editing, setEditing] = useState<AdminChapterListItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editPremium, setEditPremium] = useState(false);
+  const [editCoinCost, setEditCoinCost] = useState('0');
+  const [editStatus, setEditStatus] = useState('draft');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     adminApi
@@ -55,6 +64,40 @@ export default function AdminChapters() {
     if (translationId) loadChapters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translationId]);
+
+  const openEdit = (ch: AdminChapterListItem) => {
+    setEditing(ch);
+    setEditTitle(ch.title);
+    setEditPremium(!!ch.isPremium);
+    setEditCoinCost(String(ch.coinCost ?? 0));
+    setEditStatus(ch.publishStatus || 'draft');
+    setEditError('');
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      const payload: Record<string, unknown> = {
+        title: editTitle.trim(),
+        isPremium: editPremium,
+        coinCost: Number(editCoinCost) || 0,
+        publishStatus: editStatus,
+      };
+      if (editStatus === 'published') {
+        payload.publishedAt = new Date().toISOString();
+      }
+      await adminApi.updateChapter(editing.id, payload);
+      setEditing(null);
+      loadChapters();
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : 'Failed to update chapter.');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,7 +203,7 @@ export default function AdminChapters() {
       <p className="text-xs text-gray-500 dark:text-gray-400">
         Manuscript: DOCX or TXT. Put each chapter on its own line as{' '}
         <span className="font-mono">Chapter 1</span>, <span className="font-mono">Chapter 2: Title</span>, etc.
-        Imports as <strong>draft</strong>.
+        Imports as <strong>draft</strong>. Edit a row to publish, set premium, or change coin cost.
       </p>
 
       {error && (
@@ -268,8 +311,17 @@ export default function AdminChapters() {
                           <div className="flex items-center gap-1.5 justify-end">
                             <button
                               type="button"
+                              onClick={() => openEdit(ch)}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleDelete(ch.id)}
                               className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
+                              title="Delete"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -356,6 +408,77 @@ export default function AdminChapters() {
           </form>
         </div>
       )}
+
+      {editing && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleEdit}
+            className="bg-white dark:bg-[#1e1e32] rounded-2xl p-6 w-full max-w-lg animate-slide-up"
+          >
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Edit Chapter</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              #{editing.number} · {editing.wordCount.toLocaleString()} words
+            </p>
+            {editError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
+                {editError}
+              </div>
+            )}
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                placeholder="Chapter Title"
+                className="input-field"
+                required
+              />
+              <div className="flex gap-3">
+                <select
+                  value={editPremium ? 'Premium' : 'Free'}
+                  onChange={e => setEditPremium(e.target.value === 'Premium')}
+                  className="input-field flex-1"
+                >
+                  <option>Free</option>
+                  <option>Premium</option>
+                </select>
+                <input
+                  type="number"
+                  value={editCoinCost}
+                  onChange={e => setEditCoinCost(e.target.value)}
+                  placeholder="Coin Cost"
+                  className="input-field flex-1"
+                  min={0}
+                />
+              </div>
+              <select
+                value={editStatus}
+                onChange={e => setEditStatus(e.target.value)}
+                className="input-field"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={editSubmitting}
+                className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
+              >
+                {editSubmitting ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
-            }
+                                  }
