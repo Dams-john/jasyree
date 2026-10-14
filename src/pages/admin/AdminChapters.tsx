@@ -87,7 +87,22 @@ export default function AdminChapters() {
         publishStatus: editStatus,
       };
       if (editStatus === 'published') {
-        payload.publishedAt = new Date().toISOString();
+        const d = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        payload.publishedAt =
+          d.getUTCFullYear() +
+          '-' +
+          pad(d.getUTCMonth() + 1) +
+          '-' +
+          pad(d.getUTCDate()) +
+          ' ' +
+          pad(d.getUTCHours()) +
+          ':' +
+          pad(d.getUTCMinutes()) +
+          ':' +
+          pad(d.getUTCSeconds());
+      } else {
+        payload.publishedAt = null;
       }
       await adminApi.updateChapter(editing.id, payload);
       setEditing(null);
