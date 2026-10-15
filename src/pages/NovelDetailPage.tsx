@@ -127,7 +127,7 @@ export default function NovelDetailPage() {
     }
   };
 
-  const readPath = (chapterNum: number) => `/read/\( {id ?? novel?.id}/ \){chapterNum}`;
+  const readPath = (chapterNum: number) => `/read/${id ?? novel?.id}/${chapterNum}`;
 
   const handleReadChapter = (chapterNum: number, isPremium: boolean, isUnlocked?: boolean) => {
     const ch = chapters.find(c => c.number === chapterNum);
