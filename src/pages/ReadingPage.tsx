@@ -37,7 +37,10 @@ export default function ReadingPage() {
 
   const chN = Number(chapterNum);
   const chapter = chapters.find(c => c.number === chN);
-  const totalChapters = novel?.chapters || chapters.length || 1;
+  const maxChapterNum =
+    chapters.length > 0
+      ? Math.max(...chapters.map(c => c.number))
+      : novel?.chapters || 1;
   const progressReported = useRef(false);
 
   useEffect(() => {
