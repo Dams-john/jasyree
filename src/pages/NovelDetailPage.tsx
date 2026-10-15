@@ -18,6 +18,11 @@ export default function NovelDetailPage() {
   const [tab, setTab] = useState<Tab>('chapters');
   const [showUnlock, setShowUnlock] = useState(false);
   const [unlockChapter, setUnlockChapter] = useState<number | null>(null);
+  const [unlockChapter, setUnlockChapter] = useState<number | null>(null);
+  const [unlockChapterId, setUnlockChapterId] = useState<number | null>(null);
+  const [unlockCoinCost, setUnlockCoinCost] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState('');
 
   const [novel, setNovel] = useState<Novel | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
