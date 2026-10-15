@@ -206,7 +206,7 @@ foreach ($routes as [$routeMethod, $pattern, $handler]) {
         continue;
     }
 
-    $regex = '#^' . preg_replace('/\{[a-zA-Z_]+\}/', '([^/]+)', \( pattern) . ' \)#';
+    $regex = '#^' . preg_replace('/\{[a-zA-Z_]+\}/', '([^/]+)', $pattern) . '$#';
     if (preg_match($regex, $uri, $matches)) {
         array_shift($matches); // drop full match
         if (is_callable($handler)) {
