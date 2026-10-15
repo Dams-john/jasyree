@@ -70,6 +70,11 @@ export const novelApi = {
     apiFetch<{ id: number; number: number; title: string; content: string; publishedAt: string; isPremium: boolean }>(
       `/chapters/${chapterId}`
     ),
+  unlockChapter: (chapterId: number) =>
+    apiFetch<{ chapterId: number; coinsSpent: number; balance: number }>(`/chapters/${chapterId}/unlock`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 };
 
 export const userApi = {
