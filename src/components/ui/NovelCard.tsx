@@ -65,11 +65,6 @@ export default function NovelCard({ novel, variant = 'default', showProgress = f
             VIP
           </div>
         )}
-        {novel.status === 'Completed' && (
-          <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-            END
-          </div>
-        )}
         {showProgress && novel.progress !== undefined && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
             <div className="h-full bg-[#e91e8c]" style={{ width: `${novel.progress}%` }} />
