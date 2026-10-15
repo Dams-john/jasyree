@@ -390,20 +390,65 @@ export default function NovelDetailPage() {
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Premium Chapter</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Unlock Chapter {unlockChapter} to continue reading.
+                {unlockCoinCost > 0 ? ` Use ${unlockCoinCost} coins or subscribe.` : ''}
               </p>
             </div>
             <div className="space-y-3">
-              <Link to="/subscription" onClick={() => setShowUnlock(false)}
-                className="block text-center py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+              {unlockCoinCost > 0 && (
+                <button
+                  type="button"
+                  disabled={unlocking || !unlockChapterId}
+                  className="w-full py-3 rounded-xl bg-[#e91e8c] text-white text-sm font-semibold disabled:opacity-50"
+                  onClick={async () => {
+                    if (!isAuthenticated) {
+                      navigate('/login');
+                      return;
+                    }
+                    if (!unlockChapterId) return;
+                    setUnlocking(true);
+                    setUnlockError('');
+                    try {
+                      await novelApi.unlockChapter(unlockChapterId);
+                      setShowUnlock(false);
+                      const ch = await novelApi.chapters(id!);
+                      setChapters(ch);
+                      navigate(`/read/\( {id}/ \){unlockChapter}`);
+                    } catch (err) {
+                      if (err instanceof ApiError && err.status === 402) {
+                        setUnlockError('Not enough coins. Buy more or subscribe.');
+                      } else {
+                        setUnlockError(err instanceof ApiError ? err.message : 'Unlock failed.');
+                      }
+                    } finally {
+                      setUnlocking(false);
+                    }
+                  }}
+                >
+                  {unlocking ? 'Unlocking…' : `Unlock · ${unlockCoinCost} coins`}
+                </button>
+              )}
+              <Link
+                to="/buy-coins"
+                onClick={() => setShowUnlock(false)}
+                className="block text-center py-3 rounded-xl border border-amber-500/50 text-amber-600 dark:text-amber-400 text-sm font-semibold"
+              >
+                Buy coins
+              </Link>
+              <Link
+                to="/subscription"
+                onClick={() => setShowUnlock(false)}
+                className="block text-center py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
                 ✨ Subscribe for Unlimited Access
               </Link>
             </div>
-            <button onClick={() => setShowUnlock(false)} className="w-full mt-3 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+            {unlockError && <p className="text-sm text-red-500 text-center mt-2">{unlockError}</p>}
+            <button
+              onClick={() => setShowUnlock(false)}
+              className="w-full mt-3 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            >
               Cancel
             </button>
           </div>
         </div>
       )}
-    </div>
-  );
-}
