@@ -172,7 +172,6 @@ export default function HomePage() {
                       {novel.status}
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Updated {novel.updatedAt}</p>
                 </div>
               </Link>
             ))}
