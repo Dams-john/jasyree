@@ -113,6 +113,20 @@ export default function NovelDetailPage() {
   };
 
   const handleReadChapter = (chapterNum: number, isPremium: boolean, isUnlocked?: boolean) => {
+    const ch = chapters.find(c => c.number === chapterNum);
+    if (isPremium && !isUnlocked) {
+      setUnlockChapter(chapterNum);
+      setUnlockChapterId(ch?.id ?? null);
+      setUnlockCoinCost(ch?.coinCost ?? 0);
+      setUnlockError('');
+      setShowUnlock(true);
+      return;
+    }
+    // Use the same id/slug that loaded this page
+    navigate(`/read/\( {id}/ \){chapterNum}`);
+  };
+
+  const handleReadChapter = (chapterNum: number, isPremium: boolean, isUnlocked?: boolean) => {
     if (isPremium && !isUnlocked) {
       setUnlockChapter(chapterNum);
       setShowUnlock(true);
