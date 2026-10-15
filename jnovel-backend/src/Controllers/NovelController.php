@@ -136,6 +136,83 @@ class NovelController
         ]);
     }
 
+    /** POST /api/chapters/{id}/unlock — spend coins to unlock a premium chapter */
+    public function unlockChapter(string $id): void
+    {
+        $userId = AuthMiddleware::requireUserId();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare("
+            SELECT id, title, is_premium, coin_cost, publish_status
+            FROM chapters WHERE id = ?
+        ");
+        $stmt->execute([(int) $id]);
+        $chapter = $stmt->fetch();
+        if (!$chapter) {
+            Response::error('Chapter not found.', 404);
+        }
+        if (!(bool) $chapter['is_premium']) {
+            Response::success(['alreadyFree' => true], 'Chapter is free.');
+        }
+
+        $check = $pdo->prepare("SELECT 1 FROM chapter_unlocks WHERE user_id = ? AND chapter_id = ?");
+        $check->execute([$userId, $chapter['id']]);
+        if ($check->fetch()) {
+            Response::success(['alreadyUnlocked' => true], 'Already unlocked.');
+        }
+
+        $cost = (int) $chapter['coin_cost'];
+        if ($cost < 1) {
+            Response::error('This chapter has no coin price set.', 422);
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $u = $pdo->prepare("SELECT coins FROM users WHERE id = ? FOR UPDATE");
+            $u->execute([$userId]);
+            $user = $u->fetch();
+            if (!$user) {
+                $pdo->rollBack();
+                Response::error('User not found.', 404);
+            }
+            $balance = (int) $user['coins'];
+            if ($balance < $cost) {
+                $pdo->rollBack();
+                Response::error('Not enough coins.', 402, [
+                    'required' => $cost,
+                    'balance' => $balance,
+                ]);
+            }
+            $newBal = $balance - $cost;
+            $pdo->prepare("UPDATE users SET coins = ? WHERE id = ?")->execute([$newBal, $userId]);
+            $pdo->prepare("
+                INSERT INTO chapter_unlocks (user_id, chapter_id, coins_spent)
+                VALUES (?, ?, ?)
+            ")->execute([$userId, $chapter['id'], $cost]);
+            $pdo->prepare("
+                INSERT INTO coin_transactions
+                  (user_id, type, description, amount, balance_after, reference_type, reference_id)
+                VALUES (?, 'spend', ?, ?, ?, 'chapter_unlock', ?)
+            ")->execute([
+                $userId,
+                'Unlocked: ' . $chapter['title'],
+                -$cost,
+                $newBal,
+                $chapter['id'],
+            ]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        Response::success([
+            'chapterId' => (int) $chapter['id'],
+            'coinsSpent' => $cost,
+            'balance' => $newBal,
+        ], 'Chapter unlocked.');
+    }
+
     private function resolveTranslationId(string $identifier, string $lang): ?int
     {
         $pdo = Database::connection();
