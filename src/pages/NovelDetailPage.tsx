@@ -277,7 +277,7 @@ export default function NovelDetailPage() {
                 {ch.isPremium && !ch.isUnlocked ? (
                   <span className="flex items-center gap-1 text-xs font-medium text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 rounded-full">
                     <Lock className="w-3 h-3" />
-                    {ch.coinCost} Coins
+                    Locked
                   </span>
                 ) : ch.isRead ? (
                   <span className="text-xs text-emerald-500 font-medium">Read</span>
