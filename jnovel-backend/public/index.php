@@ -120,6 +120,7 @@ $routes = [
     ['GET', '/api/novels/{id}', [NovelController::class, 'show']],
     ['GET', '/api/novels/{id}/chapters', [NovelController::class, 'chapters']],
     ['GET', '/api/chapters/{id}', [NovelController::class, 'chapterContent']],
+    ['POST', '/api/chapters/{id}/unlock', [NovelController::class, 'unlockChapter']],
 
     ['POST', '/api/auth/register', [AuthController::class, 'register']],
     ['POST', '/api/auth/login', [AuthController::class, 'login']],
@@ -205,7 +206,7 @@ foreach ($routes as [$routeMethod, $pattern, $handler]) {
         continue;
     }
 
-    $regex = '#^' . preg_replace('/\{[a-zA-Z_]+\}/', '([^/]+)', $pattern) . '$#';
+    $regex = '#^' . preg_replace('/\{[a-zA-Z_]+\}/', '([^/]+)', \( pattern) . ' \)#';
     if (preg_match($regex, $uri, $matches)) {
         array_shift($matches); // drop full match
         if (is_callable($handler)) {
