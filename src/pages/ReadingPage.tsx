@@ -377,8 +377,12 @@ export default function ReadingPage() {
           </div>
 
           <button
-            onClick={() => chN < totalChapters && navigate(`/read/\( {novelId}/ \){chN + 1}`)}
-            disabled={chN >= totalChapters}
+            onClick={() => {
+              const nextNum = chN + 1;
+              if (nextNum > maxChapterNum) return;
+              navigate(`/read/${novelId}/${nextNum}`);
+            }}
+            disabled={chN >= maxChapterNum}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-[#e91e8c] text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-[#c41578]"
           >
             {t.next}
