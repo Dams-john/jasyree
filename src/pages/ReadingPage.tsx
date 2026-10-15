@@ -335,7 +335,7 @@ export default function ReadingPage() {
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <button
-            onClick={() => chN > 1 && navigate(`/read/\( {novelId}/ \){chN - 1}`)}
+            onClick={() => chN > 1 && navigate(`/read/${novelId}/${chN - 1}`)}
             disabled={chN <= 1}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
             style={{
