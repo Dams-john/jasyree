@@ -41,7 +41,6 @@ export default function AdminNovels() {
   const load = () => {
     setLoading(true);
     setError('');
-
     Promise.all([
       adminApi.listNovels().catch(err => {
         setError(err instanceof ApiError ? err.message : 'Failed to load novels.');
@@ -151,10 +150,11 @@ export default function AdminNovels() {
       setEditSynopsis(t.synopsis || '');
       setEditCover(t.cover || '');
       setEditStatus(t.status || 'ongoing');
-      const genres = (detail as { genres?: { id: number }[] }).genres;
-      setEditGenreIds(Array.isArray(genres) ? genres.map(g => g.id) : []);
+      setEditGenreIds(
+        Array.isArray(detail.genres) ? detail.genres.map(g => g.id) : []
+      );
       const tags = (detail as { tags?: { id: number }[] }).tags;
-      setEditTagIds(Array.isArray(tags) ? tags.map(t => t.id) : []);
+      setEditTagIds(Array.isArray(tags) ? tags.map(x => x.id) : []);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load novel for edit.');
     }
@@ -356,122 +356,97 @@ export default function AdminNovels() {
                 </div>
               )}
             </div>
-
             <div className="px-5 py-3 space-y-3 overflow-y-auto flex-1 min-h-0">
-              <input
-                type="text"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="Novel Title"
-                className="input-field"
-                required
-              />
-              <select
-                value={penNameId}
-                onChange={e => setPenNameId(e.target.value ? Number(e.target.value) : '')}
-                className="input-field"
-                required
-              >
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Novel Title" className="input-field" required />
+              <select value={penNameId} onChange={e => setPenNameId(e.target.value ? Number(e.target.value) : '')} className="input-field" required>
                 <option value="">Select Pen Name…</option>
                 {penNames.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
-              <textarea
-                value={synopsis}
-                onChange={e => setSynopsis(e.target.value)}
-                placeholder="Synopsis"
-                className="input-field resize-none h-24"
-                required
-              />
-              <input
-                type="url"
-                value={cover}
-                onChange={e => setCover(e.target.value)}
-                placeholder="Cover image URL (optional)"
-                className="input-field"
-              />
+              <textarea value={synopsis} onChange={e => setSynopsis(e.target.value)} placeholder="Synopsis" className="input-field resize-none h-24" required />
+              <input type="url" value={cover} onChange={e => setCover(e.target.value)} placeholder="Cover image URL (optional)" className="input-field" />
               <select value={status} onChange={e => setStatus(e.target.value)} className="input-field">
                 <option value="ongoing">Ongoing</option>
                 <option value="completed">Completed</option>
                 <option value="hiatus">Hiatus</option>
               </select>
-
               {availableGenres.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                    Genres (pick one or more)
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Genres (pick one or more)</label>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableGenres.map(g => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => toggleGenre(g.id)}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                          selectedGenreIds.includes(g.id)
-                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
-                        }`}
-                      >
-                        {g.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-{availableGenres.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                    Genres
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
-                    {availableGenres.map(g => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() =>
-                          setEditGenreIds(prev =>
-                            prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
-                          )
-                        }
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                          editGenreIds.includes(g.id)
-                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
-                        }`}
-                      >
+                      <button key={g.id} type="button" onClick={() => toggleGenre(g.id)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedGenreIds.includes(g.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
                         {g.name}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
-
               {availableTags.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                    Tags
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Select Tags</label>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableTags.map(tag => (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() =>
-                          setEditTagIds(prev =>
-                            prev.includes(tag.id)
-                              ? prev.filter(id => id !== tag.id)
-                              : [...prev, tag.id]
-                          )
-                        }
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                          editTagIds.includes(tag.id)
-                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
-                        }`}
-                      >
+                      <button key={tag.id} type="button" onClick={() => toggleTag(tag.id)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedTagIds.includes(tag.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
+                        #{tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {penNames.length === 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">You need a pen name first — add one under Pen Names.</p>
+              )}
+            </div>
+            <div className="flex gap-3 p-4 pt-3 shrink-0 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1e1e32]">
+              <button type="button" onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
+              <button type="submit" disabled={submitting || penNames.length === 0} className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50">{submitting ? 'Adding…' : 'Add Novel'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editingNovelId !== null && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <form onSubmit={handleEdit} className="bg-white dark:bg-[#1e1e32] rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[min(90vh,720px)] overflow-y-auto p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Edit Novel</h3>
+            {editError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">{editError}</div>
+            )}
+            <div className="space-y-3">
+              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Novel Title" className="input-field" required />
+              <textarea value={editSynopsis} onChange={e => setEditSynopsis(e.target.value)} placeholder="Synopsis" className="input-field resize-none h-24" required />
+              <input type="url" value={editCover} onChange={e => setEditCover(e.target.value)} placeholder="Cover image URL (optional)" className="input-field" />
+              <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="input-field">
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+                <option value="hiatus">Hiatus</option>
+              </select>
+              {availableGenres.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Genres</label>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                    {availableGenres.map(g => (
+                      <button key={g.id} type="button"
+                        onClick={() => setEditGenreIds(prev => prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id])}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${editGenreIds.includes(g.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {availableTags.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Tags</label>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                    {availableTags.map(tag => (
+                      <button key={tag.id} type="button"
+                        onClick={() => setEditTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${editTagIds.includes(tag.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
                         #{tag.name}
                       </button>
                     ))}
@@ -480,110 +455,9 @@ export default function AdminNovels() {
               )}
             </div>
             <div className="flex gap-3 mt-5">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingNovelId(null);
-                  setEditTranslationId(null);
-                }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={editSubmitting}
-                className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
-              >
-                {editSubmitting ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-
-      {editingNovelId !== null && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <form
-            onSubmit={handleEdit}
-            className="bg-white dark:bg-[#1e1e32] rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[min(90vh,720px)] overflow-y-auto p-6 shadow-xl"
-          >
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Edit Novel</h3>
-            {editError && (
-              <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
-                {editError}
-              </div>
-            )}
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={editTitle}
-                onChange={e => setEditTitle(e.target.value)}
-                placeholder="Novel Title"
-                className="input-field"
-                required
-              />
-              <textarea
-                value={editSynopsis}
-                onChange={e => setEditSynopsis(e.target.value)}
-                placeholder="Synopsis"
-                className="input-field resize-none h-24"
-                required
-              />
-              <input
-                type="url"
-                value={editCover}
-                onChange={e => setEditCover(e.target.value)}
-                placeholder="Cover image URL (optional)"
-                className="input-field"
-              />
-              <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="input-field">
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-                <option value="hiatus">Hiatus</option>
-              </select>
-
-              {availableGenres.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                    Genres
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
-                    {availableGenres.map(g => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() =>
-                          setEditGenreIds(prev =>
-                            prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
-                          )
-                        }
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                          editGenreIds.includes(g.id)
-                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
-                        }`}
-                      >
-                        {g.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingNovelId(null);
-                  setEditTranslationId(null);
-                }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={editSubmitting}
-                className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
-              >
+              <button type="button" onClick={() => { setEditingNovelId(null); setEditTranslationId(null); }}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
+              <button type="submit" disabled={editSubmitting} className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50">
                 {editSubmitting ? 'Saving…' : 'Save'}
               </button>
             </div>
@@ -592,4 +466,4 @@ export default function AdminNovels() {
       )}
     </div>
   );
-}
+                }
