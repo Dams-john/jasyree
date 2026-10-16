@@ -1155,6 +1155,44 @@ class AdminController
         return $novel;
     }
 
+    /** PUT /api/admin/novels/{id}/tags */
+    public function updateNovelTags(string $id): void
+    {
+        $payload = AuthMiddleware::requireRole(['author', 'admin']);
+        $pdo = Database::connection();
+        $novelId = (int) $id;
+
+        $stmt = $pdo->prepare("
+            SELECT n.id FROM novels n
+            INNER JOIN pen_names pn ON pn.id = n.pen_name_id
+            WHERE n.id = ?" . ($payload['role'] === 'admin' ? '' : ' AND pn.user_id = ?')
+        );
+        $params = $payload['role'] === 'admin' ? [$novelId] : [$novelId, $payload['sub']];
+        $stmt->execute($params);
+        if (!$stmt->fetch()) {
+            Response::error('Novel not found or access denied.', 404);
+        }
+
+        $data = $this->body();
+        $tagIds = $data['tagIds'] ?? [];
+        if (!is_array($tagIds)) {
+            Response::error('tagIds must be an array.', 422);
+        }
+
+        $this->syncTags($novelId, $tagIds);
+        Response::success(null, 'Tags updated.');
+    }
+
+    private function syncTags(int $novelId, array $tagIds): void
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('DELETE FROM novel_tags WHERE novel_id = ?')->execute([$novelId]);
+        $ins = $pdo->prepare('INSERT INTO novel_tags (novel_id, tag_id) VALUES (?, ?)');
+        foreach ($tagIds as $tagId) {
+            $ins->execute([$novelId, (int) $tagId]);
+        }
+    }
+
     private function getOwnedTranslationOr404(int $translationId, array $payload): array
     {
         $pdo = Database::connection();
