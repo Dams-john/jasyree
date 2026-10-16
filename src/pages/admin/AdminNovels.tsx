@@ -153,6 +153,8 @@ export default function AdminNovels() {
       setEditStatus(t.status || 'ongoing');
       const genres = (detail as { genres?: { id: number }[] }).genres;
       setEditGenreIds(Array.isArray(genres) ? genres.map(g => g.id) : []);
+      const tags = (detail as { tags?: { id: number }[] }).tags;
+      setEditTagIds(Array.isArray(tags) ? tags.map(t => t.id) : []);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load novel for edit.');
     }
@@ -171,6 +173,8 @@ export default function AdminNovels() {
         status: editStatus,
       });
       await adminApi.updateNovelGenres(editingNovelId, editGenreIds);
+      await adminApi.updateNovelGenres(editingNovelId, editGenreIds);
+      await adminApi.updateNovelTags(editingNovelId, editTagIds);
       setEditingNovelId(null);
       setEditTranslationId(null);
       load();
