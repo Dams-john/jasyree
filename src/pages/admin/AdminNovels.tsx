@@ -35,6 +35,7 @@ export default function AdminNovels() {
   const [editStatus, setEditStatus] = useState('ongoing');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
+  const [editGenreIds, setEditGenreIds] = useState<number[]>([]);
 
   const load = () => {
     setLoading(true);
@@ -149,6 +150,8 @@ export default function AdminNovels() {
       setEditSynopsis(t.synopsis || '');
       setEditCover(t.cover || '');
       setEditStatus(t.status || 'ongoing');
+      const genres = (detail as { genres?: { id: number }[] }).genres;
+      setEditGenreIds(Array.isArray(genres) ? genres.map(g => g.id) : []);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load novel for edit.');
     }
@@ -156,7 +159,7 @@ export default function AdminNovels() {
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editTranslationId) return;
+    if (!editTranslationId || editingNovelId == null) return;
     setEditSubmitting(true);
     setEditError('');
     try {
@@ -166,6 +169,7 @@ export default function AdminNovels() {
         cover: editCover.trim() || null,
         status: editStatus,
       });
+      await adminApi.updateNovelGenres(editingNovelId, editGenreIds);
       setEditingNovelId(null);
       setEditTranslationId(null);
       load();
@@ -505,6 +509,34 @@ export default function AdminNovels() {
                 <option value="completed">Completed</option>
                 <option value="hiatus">Hiatus</option>
               </select>
+
+              {availableGenres.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                    Genres
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                    {availableGenres.map(g => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() =>
+                          setEditGenreIds(prev =>
+                            prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
+                          )
+                        }
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          editGenreIds.includes(g.id)
+                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
+                        }`}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-5">
               <button
