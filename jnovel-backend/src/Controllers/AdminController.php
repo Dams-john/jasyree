@@ -102,6 +102,7 @@ class AdminController
             'penNameId' => (int) $novel['pen_name_id'],
             'isFeatured' => (bool) $novel['is_featured'],
             'genres' => $genreStmt->fetchAll(),
+            'tags' => $tagStmt->fetchAll(),
             'translations' => array_map(fn($t) => [
                 'id' => (int) $t['id'],
                 'language' => $t['language'],
