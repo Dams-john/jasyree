@@ -186,6 +186,7 @@ $routes = [
     ['GET', '/api/admin/novels/{id}', [AdminController::class, 'showNovel']],
     ['DELETE', '/api/admin/novels/{id}', [AdminController::class, 'deleteNovel']],
     ['POST', '/api/admin/novels/{id}/translations', [AdminController::class, 'addTranslation']],
+    ['PUT', '/api/admin/novels/{id}/genres', [AdminController::class, 'updateNovelGenres']],
     ['PUT', '/api/admin/translations/{id}', [AdminController::class, 'updateTranslation']],
 
     // Admin dashboard — chapters (per language edition)
