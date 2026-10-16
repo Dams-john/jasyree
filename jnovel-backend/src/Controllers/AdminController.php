@@ -89,6 +89,13 @@ class AdminController
         $genreStmt = $pdo->prepare("SELECT g.id, g.name FROM novel_genres ng INNER JOIN genres g ON g.id = ng.genre_id WHERE ng.novel_id = ?");
         $genreStmt->execute([$novel['id']]);
 
+        $tagStmt = $pdo->prepare("
+            SELECT t.id, t.name FROM novel_tags nt
+            INNER JOIN tags t ON t.id = nt.tag_id
+            WHERE nt.novel_id = ?
+        ");
+        $tagStmt->execute([$novel['id']]);
+
         Response::success([
             'id' => (int) $novel['id'],
             'slug' => $novel['slug'],
