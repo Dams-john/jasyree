@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Plus, Eye, Search, Upload, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { adminApi, AdminNovelListItem, PenName, Tag } from '../../lib/resources';
+import { adminApi, AdminNovelListItem, PenName, Tag, genreApi } from '../../lib/resources';
 import { ApiError } from '../../lib/api';
+import { Genre } from '../../data/genres';
 
 export default function AdminNovels() {
   const [query, setQuery] = useState('');
@@ -11,6 +12,8 @@ export default function AdminNovels() {
   const [penNames, setPenNames] = useState<PenName[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+  const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -44,11 +47,13 @@ export default function AdminNovels() {
       }),
       adminApi.listPenNames().catch(() => [] as PenName[]),
       adminApi.listTags().catch(() => [] as Tag[]),
+      genreApi.list().catch(() => [] as Genre[]),
     ])
-      .then(([n, p, t]) => {
+      .then(([n, p, t, g]) => {
         setNovels(n);
         setPenNames(p);
         setAvailableTags(t);
+        setAvailableGenres(g);
       })
       .finally(() => setLoading(false));
   };
@@ -71,6 +76,12 @@ export default function AdminNovels() {
     );
   };
 
+  const toggleGenre = (genreId: number) => {
+    setSelectedGenreIds(prev =>
+      prev.includes(genreId) ? prev.filter(id => id !== genreId) : [...prev, genreId]
+    );
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!penNameId) {
@@ -88,6 +99,7 @@ export default function AdminNovels() {
         status,
         cover: cover.trim() || undefined,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+        genreIds: selectedGenreIds.length > 0 ? selectedGenreIds : undefined,
       });
       setShowAdd(false);
       setTitle('');
@@ -95,6 +107,7 @@ export default function AdminNovels() {
       setCover('');
       setPenNameId('');
       setSelectedTagIds([]);
+      setSelectedGenreIds([]);
       load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Failed to create novel.');
@@ -377,6 +390,31 @@ export default function AdminNovels() {
                 <option value="completed">Completed</option>
                 <option value="hiatus">Hiatus</option>
               </select>
+
+              {availableGenres.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                    Genres (pick one or more)
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                    {availableGenres.map(g => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => toggleGenre(g.id)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          selectedGenreIds.includes(g.id)
+                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
+                        }`}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {availableTags.length > 0 && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
