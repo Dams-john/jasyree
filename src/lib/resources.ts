@@ -293,6 +293,12 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
 
+  updateNovelGenres: (id: number, genreIds: number[]) =>
+    apiFetch<null>(`/admin/novels/${id}/genres`, {
+      method: 'PUT',
+      body: JSON.stringify({ genreIds }),
+    }),
+
   listChapters: (translationId: number) =>
     apiFetch<AdminChapterListItem[]>(`/admin/translations/${translationId}/chapters`),
   createChapter: (
