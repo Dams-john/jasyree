@@ -421,21 +421,53 @@ export default function AdminNovels() {
                     ))}
                   </div>
                 </div>
+{availableGenres.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                    Genres
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                    {availableGenres.map(g => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() =>
+                          setEditGenreIds(prev =>
+                            prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
+                          )
+                        }
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          editGenreIds.includes(g.id)
+                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
+                        }`}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {availableTags.length > 0 && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                    Select Tags
+                    Tags
                   </label>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableTags.map(tag => (
                       <button
                         key={tag.id}
                         type="button"
-                        onClick={() => toggleTag(tag.id)}
+                        onClick={() =>
+                          setEditTagIds(prev =>
+                            prev.includes(tag.id)
+                              ? prev.filter(id => id !== tag.id)
+                              : [...prev, tag.id]
+                          )
+                        }
                         className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                          selectedTagIds.includes(tag.id)
+                          editTagIds.includes(tag.id)
                             ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
                         }`}
@@ -446,32 +478,26 @@ export default function AdminNovels() {
                   </div>
                 </div>
               )}
-              {penNames.length === 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  You need a pen name first — add one under Pen Names.
-                </p>
-              )}
             </div>
-
-            <div className="flex gap-3 p-4 pt-3 shrink-0 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1e1e32]">
+            <div className="flex gap-3 mt-5">
               <button
                 type="button"
-                onClick={() => setShowAdd(false)}
+                onClick={() => {
+                  setEditingNovelId(null);
+                  setEditTranslationId(null);
+                }}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={submitting || penNames.length === 0}
+                disabled={editSubmitting}
                 className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
               >
-                {submitting ? 'Adding…' : 'Add Novel'}
+                {editSubmitting ? 'Saving…' : 'Save'}
               </button>
             </div>
-          </form>
-        </div>
-      )}
 
       {editingNovelId !== null && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
