@@ -878,7 +878,6 @@ class AdminController
     // ============================================================
     // PRICING
     // ============================================================
-
     public function listCoinPackages(): void
     {
         AuthMiddleware::requireRole(['admin']);
@@ -888,18 +887,43 @@ class AdminController
             FROM coin_packages ORDER BY sort_order ASC, id ASC
         ")->fetchAll();
 
-        Response::success(array_map(fn($r) => [
-            'id' => (int) $r['id'],
-            'coins' => (int) $r['coins'],
-            'price' => (float) $r['price'],
-            'currency' => $r['currency'],
-            'bonus' => (int) $r['bonus'],
-            'isPopular' => (bool) $r['is_popular'],
-            'isBestValue' => (bool) $r['is_best_value'],
-            'image' => $r['image'],
-            'isActive' => (bool) $r['is_active'],
-            'sortOrder' => (int) $r['sort_order'],
-        ], $rows));
+        $priceStmt = $pdo->query("SELECT package_id, currency, price FROM coin_package_prices");
+        $byPkg = [];
+        foreach ($priceStmt->fetchAll() as $pr) {
+            $byPkg[(int) $pr['package_id']][] = [
+                'currency' => strtoupper($pr['currency']),
+                'price' => (float) $pr['price'],
+            ];
+        }
+
+        Response::success(array_map(function ($r) use ($byPkg) {
+            $id = (int) $r['id'];
+            $prices = $byPkg[$id] ?? [[
+                'currency' => strtoupper($r['currency'] ?: 'NGN'),
+                'price' => (float) $r['price'],
+            ]];
+            $ngn = null;
+            $usd = null;
+            foreach ($prices as $p) {
+                if ($p['currency'] === 'NGN') $ngn = $p['price'];
+                if ($p['currency'] === 'USD') $usd = $p['price'];
+            }
+            return [
+                'id' => $id,
+                'coins' => (int) $r['coins'],
+                'price' => (float) $r['price'],
+                'currency' => $r['currency'],
+                'priceNgn' => $ngn,
+                'priceUsd' => $usd,
+                'prices' => $prices,
+                'bonus' => (int) $r['bonus'],
+                'isPopular' => (bool) $r['is_popular'],
+                'isBestValue' => (bool) $r['is_best_value'],
+                'image' => $r['image'],
+                'isActive' => (bool) $r['is_active'],
+                'sortOrder' => (int) $r['sort_order'],
+            ];
+        }, $rows));
     }
 
     public function updateCoinPackage(string $id): void
@@ -907,23 +931,16 @@ class AdminController
         AuthMiddleware::requireRole(['admin']);
         $data = $this->body();
         $pdo = Database::connection();
+        $pkgId = (int) $id;
 
         $stmt = $pdo->prepare("SELECT id FROM coin_packages WHERE id = ?");
-        $stmt->execute([(int) $id]);
+        $stmt->execute([$pkgId]);
         if (!$stmt->fetch()) {
             Response::error('Coin package not found.', 404);
         }
 
         $fields = [];
         $params = [];
-        if (array_key_exists('price', $data)) {
-            $fields[] = 'price = ?';
-            $params[] = (float) $data['price'];
-        }
-        if (array_key_exists('currency', $data)) {
-            $fields[] = 'currency = ?';
-            $params[] = strtoupper(trim((string) $data['currency']));
-        }
         if (array_key_exists('coins', $data)) {
             $fields[] = 'coins = ?';
             $params[] = (int) $data['coins'];
@@ -944,11 +961,38 @@ class AdminController
             $fields[] = 'is_best_value = ?';
             $params[] = $data['isBestValue'] ? 1 : 0;
         }
-        if (empty($fields)) {
-            Response::error('No fields to update.', 422);
+
+        // Prefer multi-currency fields; keep legacy price/currency in sync with NGN when present
+        if (array_key_exists('priceNgn', $data) && $data['priceNgn'] !== null && $data['priceNgn'] !== '') {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['priceNgn'];
+            $fields[] = 'currency = ?';
+            $params[] = 'NGN';
+        } elseif (array_key_exists('price', $data)) {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['price'];
         }
-        $params[] = (int) $id;
-        $pdo->prepare('UPDATE coin_packages SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        if (array_key_exists('currency', $data) && !array_key_exists('priceNgn', $data)) {
+            $fields[] = 'currency = ?';
+            $params[] = strtoupper(trim((string) $data['currency']));
+        }
+
+        if (!empty($fields)) {
+            $params[] = $pkgId;
+            $pdo->prepare('UPDATE coin_packages SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        }
+
+        $upsert = $pdo->prepare("
+            INSERT INTO coin_package_prices (package_id, currency, price) VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE price = VALUES(price)
+        ");
+        if (array_key_exists('priceNgn', $data) && $data['priceNgn'] !== null && $data['priceNgn'] !== '') {
+            $upsert->execute([$pkgId, 'NGN', (float) $data['priceNgn']]);
+        }
+        if (array_key_exists('priceUsd', $data) && $data['priceUsd'] !== null && $data['priceUsd'] !== '') {
+            $upsert->execute([$pkgId, 'USD', (float) $data['priceUsd']]);
+        }
+
         Response::success(null, 'Coin package updated.');
     }
 
@@ -962,14 +1006,37 @@ class AdminController
             FROM subscription_plans ORDER BY sort_order ASC, id ASC
         ")->fetchAll();
 
-        Response::success(array_map(function ($r) {
+        $priceStmt = $pdo->query("SELECT plan_id, currency, price FROM subscription_plan_prices");
+        $byPlan = [];
+        foreach ($priceStmt->fetchAll() as $pr) {
+            $byPlan[(int) $pr['plan_id']][] = [
+                'currency' => strtoupper($pr['currency']),
+                'price' => (float) $pr['price'],
+            ];
+        }
+
+        Response::success(array_map(function ($r) use ($byPlan) {
+            $id = (int) $r['id'];
             $features = json_decode($r['features'] ?? '[]', true);
+            $prices = $byPlan[$id] ?? [[
+                'currency' => strtoupper($r['currency'] ?: 'NGN'),
+                'price' => (float) $r['price'],
+            ]];
+            $ngn = null;
+            $usd = null;
+            foreach ($prices as $p) {
+                if ($p['currency'] === 'NGN') $ngn = $p['price'];
+                if ($p['currency'] === 'USD') $usd = $p['price'];
+            }
             return [
-                'id' => (int) $r['id'],
+                'id' => $id,
                 'name' => $r['name'],
                 'slug' => $r['slug'],
                 'price' => (float) $r['price'],
                 'currency' => $r['currency'],
+                'priceNgn' => $ngn,
+                'priceUsd' => $usd,
+                'prices' => $prices,
                 'period' => $r['period'],
                 'monthlyCoins' => (int) $r['monthly_coins'],
                 'features' => is_array($features) ? $features : [],
@@ -987,23 +1054,16 @@ class AdminController
         AuthMiddleware::requireRole(['admin']);
         $data = $this->body();
         $pdo = Database::connection();
+        $planId = (int) $id;
 
         $stmt = $pdo->prepare("SELECT id FROM subscription_plans WHERE id = ?");
-        $stmt->execute([(int) $id]);
+        $stmt->execute([$planId]);
         if (!$stmt->fetch()) {
             Response::error('Subscription plan not found.', 404);
         }
 
         $fields = [];
         $params = [];
-        if (array_key_exists('price', $data)) {
-            $fields[] = 'price = ?';
-            $params[] = (float) $data['price'];
-        }
-        if (array_key_exists('currency', $data)) {
-            $fields[] = 'currency = ?';
-            $params[] = strtoupper(trim((string) $data['currency']));
-        }
         if (array_key_exists('monthlyCoins', $data)) {
             $fields[] = 'monthly_coins = ?';
             $params[] = (int) $data['monthlyCoins'];
@@ -1020,13 +1080,36 @@ class AdminController
             $fields[] = 'is_best_value = ?';
             $params[] = $data['isBestValue'] ? 1 : 0;
         }
-        if (empty($fields)) {
-            Response::error('No fields to update.', 422);
+        if (array_key_exists('priceNgn', $data) && $data['priceNgn'] !== null && $data['priceNgn'] !== '') {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['priceNgn'];
+            $fields[] = 'currency = ?';
+            $params[] = 'NGN';
+        } elseif (array_key_exists('price', $data)) {
+            $fields[] = 'price = ?';
+            $params[] = (float) $data['price'];
         }
-        $params[] = (int) $id;
-        $pdo->prepare('UPDATE subscription_plans SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+
+        if (!empty($fields)) {
+            $params[] = $planId;
+            $pdo->prepare('UPDATE subscription_plans SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        }
+
+        $upsert = $pdo->prepare("
+            INSERT INTO subscription_plan_prices (plan_id, currency, price) VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE price = VALUES(price)
+        ");
+        if (array_key_exists('priceNgn', $data) && $data['priceNgn'] !== null && $data['priceNgn'] !== '') {
+            $upsert->execute([$planId, 'NGN', (float) $data['priceNgn']]);
+        }
+        if (array_key_exists('priceUsd', $data) && $data['priceUsd'] !== null && $data['priceUsd'] !== '') {
+            $upsert->execute([$planId, 'USD', (float) $data['priceUsd']]);
+        }
+
         Response::success(null, 'Subscription plan updated.');
-    }
+}
+
+     
 
     // ============================================================
     // Helpers
