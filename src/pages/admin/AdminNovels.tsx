@@ -173,7 +173,6 @@ export default function AdminNovels() {
         status: editStatus,
       });
       await adminApi.updateNovelGenres(editingNovelId, editGenreIds);
-      await adminApi.updateNovelGenres(editingNovelId, editGenreIds);
       await adminApi.updateNovelTags(editingNovelId, editTagIds);
       setEditingNovelId(null);
       setEditTranslationId(null);
