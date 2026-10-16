@@ -150,6 +150,35 @@ class AdminController
         Response::success(['novelId' => $novelId, 'translationId' => $translationId, 'slug' => $slug], 'Novel created.', 201);
     }
 
+    /** PUT /api/admin/novels/{id}/genres — set genre list for a novel */
+    public function updateNovelGenres(string $id): void
+    {
+        $payload = AuthMiddleware::requireRole(['author', 'admin']);
+        $pdo = Database::connection();
+        $novelId = (int) $id;
+
+        // ownership: admin any; author only own pen names
+        $stmt = $pdo->prepare("
+            SELECT n.id FROM novels n
+            INNER JOIN pen_names pn ON pn.id = n.pen_name_id
+            WHERE n.id = ?" . ($payload['role'] === 'admin' ? '' : ' AND pn.user_id = ?')
+        );
+        $params = $payload['role'] === 'admin' ? [$novelId] : [$novelId, $payload['sub']];
+        $stmt->execute($params);
+        if (!$stmt->fetch()) {
+            Response::error('Novel not found or access denied.', 404);
+        }
+
+        $data = $this->body();
+        $genreIds = $data['genreIds'] ?? [];
+        if (!is_array($genreIds)) {
+            Response::error('genreIds must be an array.', 422);
+        }
+
+        $this->syncGenres($novelId, $genreIds);
+        Response::success(null, 'Genres updated.');
+    }
+
     public function deleteNovel(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
