@@ -1183,15 +1183,6 @@ class AdminController
         Response::success(null, 'Tags updated.');
     }
 
-    private function syncTags(int $novelId, array $tagIds): void
-    {
-        $pdo = Database::connection();
-        $pdo->prepare('DELETE FROM novel_tags WHERE novel_id = ?')->execute([$novelId]);
-        $ins = $pdo->prepare('INSERT INTO novel_tags (novel_id, tag_id) VALUES (?, ?)');
-        foreach ($tagIds as $tagId) {
-            $ins->execute([$novelId, (int) $tagId]);
-        }
-    }
 
     private function getOwnedTranslationOr404(int $translationId, array $payload): array
     {
