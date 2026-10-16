@@ -35,6 +35,7 @@ export default function AdminNovels() {
   const [editStatus, setEditStatus] = useState('ongoing');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
+  const [editTagIds, setEditTagIds] = useState<number[]>([]);
   const [editGenreIds, setEditGenreIds] = useState<number[]>([]);
 
   const load = () => {
