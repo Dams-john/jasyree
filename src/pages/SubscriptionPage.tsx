@@ -4,6 +4,7 @@ import { paymentsApi, SubscriptionPlan } from '../lib/resources';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { detectMarketCurrency } from '../lib/market';
 
 const PLAN_ICONS: Record<string, typeof Star> = {
   Silver: Star,
@@ -25,10 +26,14 @@ export default function SubscriptionPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [currency, setCurrency] = useState<'NGN' | 'USD'>('USD');
 
   useEffect(() => {
+    const market = detectMarketCurrency();
+    setCurrency(market);
+    setLoading(true);
     paymentsApi
-      .listSubscriptionPlans()
+      .listSubscriptionPlans(market)
       .then(data => setPlans(data || []))
       .catch(err => setError(err instanceof ApiError ? err.message : 'Failed to load plans.'))
       .finally(() => setLoading(false));
@@ -43,7 +48,11 @@ export default function SubscriptionPage() {
     setProcessing(true);
     setError('');
     try {
-      const { checkoutUrl } = await paymentsApi.checkout({ type: 'subscription', id: planId });
+      const { checkoutUrl } = await paymentsApi.checkout({
+        type: 'subscription',
+        id: planId,
+        currency,
+      });
       if (!checkoutUrl) {
         setError('No checkout URL returned.');
         setProcessing(false);
@@ -194,4 +203,4 @@ export default function SubscriptionPage() {
       </div>
     </div>
   );
-                  }
+}
