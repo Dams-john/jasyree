@@ -5,6 +5,7 @@ import { TRANSACTIONS } from '../data/coins';
 import { paymentsApi, CoinPackage } from '../lib/resources';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { detectMarketCurrency } from '../lib/market';
 
 export default function WalletPage() {
   const { user } = useAuth();
@@ -13,14 +14,21 @@ export default function WalletPage() {
   const [packages, setPackages] = useState<CoinPackage[]>([]);
 
   useEffect(() => {
+    const currency = detectMarketCurrency();
     paymentsApi
-      .listCoinPackages()
+      .listCoinPackages(currency)
       .then(data => setPackages((data || []).slice(0, 4)))
       .catch(() => setPackages([]));
   }, []);
 
-  const totalSpent = TRANSACTIONS.filter(tx => tx.type === 'spend').reduce((acc, tx) => acc + Math.abs(tx.amount), 0);
-  const totalEarned = TRANSACTIONS.filter(tx => tx.type === 'reward').reduce((acc, tx) => acc + tx.amount, 0);
+  const totalSpent = TRANSACTIONS.filter(tx => tx.type === 'spend').reduce(
+    (acc, tx) => acc + Math.abs(tx.amount),
+    0
+  );
+  const totalEarned = TRANSACTIONS.filter(tx => tx.type === 'reward').reduce(
+    (acc, tx) => acc + tx.amount,
+    0
+  );
 
   return (
     <div className="max-w-2xl mx-auto pb-8">
