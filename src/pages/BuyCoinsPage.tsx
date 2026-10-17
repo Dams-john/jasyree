@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { paymentsApi, CoinPackage } from '../lib/resources';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { detectMarketCurrency } from '../lib/market';
 
 export default function BuyCoinsPage() {
   const navigate = useNavigate();
@@ -13,9 +14,14 @@ export default function BuyCoinsPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState('');
+  const [currency, setCurrency] = useState<'NGN' | 'USD'>('USD');
 
   useEffect(() => {
-    paymentsApi.listCoinPackages()
+    const market = detectMarketCurrency();
+    setCurrency(market);
+    setLoading(true);
+    paymentsApi
+      .listCoinPackages(market)
       .then(data => setPackages(data || []))
       .catch(err => setError(err instanceof ApiError ? err.message : 'Failed to load packages.'))
       .finally(() => setLoading(false));
@@ -30,7 +36,11 @@ export default function BuyCoinsPage() {
     setPurchasing(true);
     setError('');
     try {
-      const { checkoutUrl } = await paymentsApi.checkout({ type: 'coin_package', id: selected });
+      const { checkoutUrl } = await paymentsApi.checkout({
+        type: 'coin_package',
+        id: selected,
+        currency,
+      });
       if (!checkoutUrl) {
         setError('No checkout URL returned.');
         setPurchasing(false);
@@ -187,4 +197,4 @@ export default function BuyCoinsPage() {
       )}
     </div>
   );
-}
+  }
