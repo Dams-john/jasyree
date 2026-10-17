@@ -231,10 +231,17 @@ export interface SubscriptionPlan {
 }
 
 export const paymentsApi = {
-  listCoinPackages: () => apiFetch<CoinPackage[]>('/payments/coin-packages', { skipAuth: true }),
-  listSubscriptionPlans: () =>
-    apiFetch<SubscriptionPlan[]>('/payments/subscription-plans', { skipAuth: true }),
-  checkout: (data: { type: 'coin_package' | 'subscription'; id: number }) =>
+  listCoinPackages: (currency?: string) =>
+    apiFetch<CoinPackage[]>('/payments/coin-packages', {
+      skipAuth: true,
+      params: currency ? { currency } : undefined,
+    }),
+  listSubscriptionPlans: (currency?: string) =>
+    apiFetch<SubscriptionPlan[]>('/payments/subscription-plans', {
+      skipAuth: true,
+      params: currency ? { currency } : undefined,
+    }),
+  checkout: (data: { type: 'coin_package' | 'subscription'; id: number; currency?: string }) =>
     apiFetch<{ checkoutUrl: string; sessionId: string }>('/payments/checkout', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -370,6 +377,8 @@ export const adminApi = {
         image: string | null;
         isActive: boolean;
         sortOrder: number;
+        priceNgn?: number | null;
+        priceUsd?: number | null;
       }[]
     >('/admin/coin-packages'),
 
@@ -395,6 +404,8 @@ export const adminApi = {
         isBestValue: boolean;
         isActive: boolean;
         sortOrder: number;
+        priceNgn?: number | null;
+        priceUsd?: number | null;
       }[]
     >('/admin/subscription-plans'),
 
