@@ -42,44 +42,120 @@ class PaymentController
         return $json;
     }
 
-    /** GET /api/payments/coin-packages */
+    /** Default non-Nigeria to USD; only NGN|USD accepted from client */
+    private function resolveCurrency(?string $requested): string
+    {
+        $c = strtoupper(trim((string) $requested));
+        if (in_array($c, ['NGN', 'USD'], true)) {
+            return $c;
+        }
+        return 'USD';
+    }
+
+    private function packagePrice(array $row, string $currency, PDO $pdo): array
+    {
+        $stmt = $pdo->prepare("
+            SELECT price, currency FROM coin_package_prices
+            WHERE package_id = ? AND currency = ?
+            LIMIT 1
+        ");
+        $stmt->execute([(int) $row['id'], $currency]);
+        $p = $stmt->fetch();
+        if ($p) {
+            return ['price' => (float) $p['price'], 'currency' => strtoupper($p['currency'])];
+        }
+
+        $stmt2 = $pdo->prepare("
+            SELECT price, currency FROM coin_package_prices
+            WHERE package_id = ?
+            LIMIT 1
+        ");
+        $stmt2->execute([(int) $row['id']]);
+        $p2 = $stmt2->fetch();
+        if ($p2) {
+            return ['price' => (float) $p2['price'], 'currency' => strtoupper($p2['currency'])];
+        }
+
+        return [
+            'price' => (float) $row['price'],
+            'currency' => strtoupper($row['currency'] ?: 'NGN'),
+        ];
+    }
+
+    private function planPrice(array $row, string $currency, PDO $pdo): array
+    {
+        $stmt = $pdo->prepare("
+            SELECT price, currency FROM subscription_plan_prices
+            WHERE plan_id = ? AND currency = ?
+            LIMIT 1
+        ");
+        $stmt->execute([(int) $row['id'], $currency]);
+        $p = $stmt->fetch();
+        if ($p) {
+            return ['price' => (float) $p['price'], 'currency' => strtoupper($p['currency'])];
+        }
+
+        $stmt2 = $pdo->prepare("
+            SELECT price, currency FROM subscription_plan_prices
+            WHERE plan_id = ?
+            LIMIT 1
+        ");
+        $stmt2->execute([(int) $row['id']]);
+        $p2 = $stmt2->fetch();
+        if ($p2) {
+            return ['price' => (float) $p2['price'], 'currency' => strtoupper($p2['currency'])];
+        }
+
+        return [
+            'price' => (float) $row['price'],
+            'currency' => strtoupper($row['currency'] ?: 'NGN'),
+        ];
+    }
+
+    /** GET /api/payments/coin-packages?currency=NGN|USD */
     public function listCoinPackages(): void
     {
+        $currency = $this->resolveCurrency($_GET['currency'] ?? null);
         $pdo = Database::connection();
         $rows = $pdo->query("
             SELECT id, coins, price, currency, bonus, is_popular, is_best_value, image
             FROM coin_packages WHERE is_active = 1 ORDER BY sort_order ASC, id ASC
         ")->fetchAll();
 
-        Response::success(array_map(fn($r) => [
-            'id' => (int) $r['id'],
-            'coins' => (int) $r['coins'],
-            'price' => (float) $r['price'],
-            'currency' => $r['currency'],
-            'bonus' => (int) $r['bonus'],
-            'isPopular' => (bool) $r['is_popular'],
-            'isBestValue' => (bool) $r['is_best_value'],
-            'image' => $r['image'],
-        ], $rows));
+        Response::success(array_map(function ($r) use ($pdo, $currency) {
+            $pr = $this->packagePrice($r, $currency, $pdo);
+            return [
+                'id' => (int) $r['id'],
+                'coins' => (int) $r['coins'],
+                'price' => $pr['price'],
+                'currency' => $pr['currency'],
+                'bonus' => (int) $r['bonus'],
+                'isPopular' => (bool) $r['is_popular'],
+                'isBestValue' => (bool) $r['is_best_value'],
+                'image' => $r['image'],
+            ];
+        }, $rows));
     }
 
-    /** GET /api/payments/subscription-plans */
+    /** GET /api/payments/subscription-plans?currency=NGN|USD */
     public function listSubscriptionPlans(): void
     {
+        $currency = $this->resolveCurrency($_GET['currency'] ?? null);
         $pdo = Database::connection();
         $rows = $pdo->query("
             SELECT id, name, slug, price, currency, period, monthly_coins, features, color, is_popular, is_best_value
             FROM subscription_plans WHERE is_active = 1 ORDER BY sort_order ASC, id ASC
         ")->fetchAll();
 
-        Response::success(array_map(function ($r) {
+        Response::success(array_map(function ($r) use ($pdo, $currency) {
+            $pr = $this->planPrice($r, $currency, $pdo);
             $features = json_decode($r['features'] ?? '[]', true);
             return [
                 'id' => (int) $r['id'],
                 'name' => $r['name'],
                 'slug' => $r['slug'],
-                'price' => (float) $r['price'],
-                'currency' => $r['currency'],
+                'price' => $pr['price'],
+                'currency' => $pr['currency'],
                 'period' => $r['period'],
                 'monthlyCoins' => (int) $r['monthly_coins'],
                 'features' => is_array($features) ? $features : [],
@@ -90,7 +166,7 @@ class PaymentController
         }, $rows));
     }
 
-    /** POST /api/payments/checkout  body: { type: 'coin_package'|'subscription', id: number } */
+    /** POST /api/payments/checkout  body: { type, id, currency? } */
     public function checkout(): void
     {
         $userId = AuthMiddleware::requireUserId();
@@ -107,7 +183,9 @@ class PaymentController
             Response::error('type must be coin_package or subscription.', 422);
         }
 
+        $wantCurrency = $this->resolveCurrency($data['currency'] ?? null);
         $pdo = Database::connection();
+
         if ($type === 'coin_package') {
             $stmt = $pdo->prepare("SELECT * FROM coin_packages WHERE id = ? AND is_active = 1");
             $stmt->execute([$refId]);
@@ -115,9 +193,10 @@ class PaymentController
             if (!$item) {
                 Response::error('Coin package not found.', 404);
             }
+            $pr = $this->packagePrice($item, $wantCurrency, $pdo);
             $name = ((int) $item['coins'] + (int) $item['bonus']) . ' Coins';
-            $amount = (float) $item['price'];
-            $currency = strtolower($item['currency'] ?: 'ngn');
+            $amount = $pr['price'];
+            $currency = strtolower($pr['currency']);
         } else {
             $stmt = $pdo->prepare("SELECT * FROM subscription_plans WHERE id = ? AND is_active = 1");
             $stmt->execute([$refId]);
@@ -125,12 +204,12 @@ class PaymentController
             if (!$item) {
                 Response::error('Subscription plan not found.', 404);
             }
+            $pr = $this->planPrice($item, $wantCurrency, $pdo);
             $name = $item['name'] . ' (' . $item['period'] . ')';
-            $amount = (float) $item['price'];
-            $currency = strtolower($item['currency'] ?: 'ngn');
+            $amount = $pr['price'];
+            $currency = strtolower($pr['currency']);
         }
 
-        // Stripe expects amount in the smallest currency unit (kobo for NGN)
         $unitAmount = (int) round($amount * 100);
         $frontend = explode(',', appConfig()['app']['frontend_url'])[0] ?? 'https://jasyre.com';
         $frontend = rtrim(trim($frontend), '/');
@@ -143,6 +222,7 @@ class PaymentController
             'metadata[user_id]' => (string) $userId,
             'metadata[type]' => $type,
             'metadata[reference_id]' => (string) $refId,
+            'metadata[currency]' => strtoupper($currency),
             'line_items[0][quantity]' => 1,
             'line_items[0][price_data][currency]' => $currency,
             'line_items[0][price_data][unit_amount]' => $unitAmount,
@@ -177,7 +257,6 @@ class PaymentController
             Response::error('Invalid payload.', 400);
         }
 
-        // Optional: verify signature when STRIPE_WEBHOOK_SECRET is set
         $whSecret = appConfig()['stripe']['webhook_secret'] ?? '';
         if ($whSecret !== '') {
             $sig = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
@@ -279,7 +358,6 @@ class PaymentController
 
     private function verifyStripeSignature(string $payload, string $header, string $secret): bool
     {
-        // Stripe-Signature: t=timestamp,v1=signature
         $parts = [];
         foreach (explode(',', $header) as $piece) {
             [$k, $v] = array_pad(explode('=', trim($piece), 2), 2, null);
