@@ -34,6 +34,10 @@ import AdminNovels from './pages/admin/AdminNovels';
 import AdminNovelDetail from './pages/admin/AdminNovelDetail';
 import AdminPenNames from './pages/admin/AdminPenNames';
 import AdminGenres from './pages/admin/AdminGenres';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 
 
 export default function App() {
@@ -82,6 +86,10 @@ export default function App() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/comments" element={<CommentsPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
