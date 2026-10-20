@@ -267,15 +267,28 @@ class Novel
     }
 
     /**
-     * Single home payload: 6 list queries + one shared hydrate (not 6× hydrate).
-     * Cuts home from \~24–40 DB round-trips down to \~10.
+     * Single home payload: fewer columns + one shared light hydrate.
      */
     public static function getHomeData(string $lang, ?int $userId = null): array
     {
         $pdo = Database::connection();
 
-        $fetch = static function (string $extraSql, int $limit) use ($pdo, $lang): array {
-            $stmt = $pdo->prepare(self::BASE_SELECT . " {$extraSql} LIMIT ?");
+        // No synopsis on home cards — biggest payload win
+        $homeSelect = "
+            SELECT
+                nt.id AS translation_id, n.id AS novel_id, nt.title, nt.slug, nt.cover,
+                '' AS synopsis,
+                nt.status, nt.language, nt.chapters_count, nt.published_at, nt.updated_at,
+                n.is_featured, n.rating_avg, n.rating_count, n.views_count,
+                pn.name AS pen_name
+            FROM novel_translations nt
+            INNER JOIN novels n ON n.id = nt.novel_id
+            INNER JOIN pen_names pn ON pn.id = n.pen_name_id
+            WHERE nt.language = ? AND nt.publish_status = 'published'
+        ";
+
+        $fetch = static function (string $extraSql, int $limit) use ($pdo, $lang, $homeSelect): array {
+            $stmt = $pdo->prepare($homeSelect . " {$extraSql} LIMIT ?");
             $stmt->bindValue(1, $lang, PDO::PARAM_STR);
             $stmt->bindValue(2, $limit, PDO::PARAM_INT);
             $stmt->execute();
@@ -291,7 +304,7 @@ class Novel
         $recommendedRows = [];
         if ($userId) {
             $stmt = $pdo->prepare("
-                " . self::BASE_SELECT . "
+                {$homeSelect}
                 AND n.id NOT IN (
                     SELECT novel_id FROM favorites WHERE user_id = ?
                     UNION
@@ -332,9 +345,37 @@ class Novel
             $byNovelId[(int) $row['novel_id']] = $row;
         }
 
-        $hydratedList = self::hydrate(array_values($byNovelId), $userId);
+        // Light hydrate: genres only (no tags, no like counts)
+        $uniqueRows = array_values($byNovelId);
+        if (!empty($uniqueRows)) {
+            $novelIds = array_unique(array_column($uniqueRows, 'novel_id'));
+            $placeholders = implode(',', array_fill(0, count($novelIds), '?'));
+            $genreStmt = $pdo->prepare("
+                SELECT ng.novel_id, g.name
+                FROM novel_genres ng
+                INNER JOIN genres g ON g.id = ng.genre_id
+                WHERE ng.novel_id IN ($placeholders)
+            ");
+            $genreStmt->execute($novelIds);
+            $genresByNovel = [];
+            foreach ($genreStmt->fetchAll() as $g) {
+                $genresByNovel[$g['novel_id']][] = $g['name'];
+            }
+            foreach ($uniqueRows as &$row) {
+                $row['genres'] = $genresByNovel[$row['novel_id']] ?? [];
+                $row['tags'] = [];
+                $row['like_count'] = 0;
+            }
+            unset($row);
+        }
+
+        $withContext = self::attachUserContext($uniqueRows, $userId);
         $shapeByNovelId = [];
-        foreach ($hydratedList as $novel) {
+        foreach ($withContext as $pair) {
+            $novel = self::toApiShape(
+                $pair[0],
+                $pair[1] ?? ['isBookmarked' => false, 'isFavorite' => false, 'isLiked' => false]
+            );
             $shapeByNovelId[(int) $novel['id']] = $novel;
         }
 
@@ -358,7 +399,7 @@ class Novel
             'completed' => $mapSection($completedRows),
             'continueReading' => $userId ? self::getContinueReading($userId) : [],
         ];
-    }
+}
 
     public static function getByGenre(string $genreSlug, string $lang, int $page = 1, int $perPage = 20, ?int $userId = null): array
     {
