@@ -266,6 +266,100 @@ class Novel
         return self::hydrate($stmt->fetchAll(), $userId);
     }
 
+    /**
+     * Single home payload: 6 list queries + one shared hydrate (not 6× hydrate).
+     * Cuts home from \~24–40 DB round-trips down to \~10.
+     */
+    public static function getHomeData(string $lang, ?int $userId = null): array
+    {
+        $pdo = Database::connection();
+
+        $fetch = static function (string $extraSql, int $limit) use ($pdo, $lang): array {
+            $stmt = $pdo->prepare(self::BASE_SELECT . " {$extraSql} LIMIT ?");
+            $stmt->bindValue(1, $lang, PDO::PARAM_STR);
+            $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll();
+        };
+
+        $featuredRows = $fetch('AND n.is_featured = 1 ORDER BY nt.updated_at DESC', 4);
+        $trendingRows = $fetch('ORDER BY n.views_count DESC', 8);
+        $latestRows = $fetch('ORDER BY nt.updated_at DESC', 10);
+        $newRows = $fetch('ORDER BY nt.published_at DESC', 10);
+        $completedRows = $fetch("AND nt.status = 'completed' ORDER BY nt.updated_at DESC", 10);
+
+        $recommendedRows = [];
+        if ($userId) {
+            $stmt = $pdo->prepare("
+                " . self::BASE_SELECT . "
+                AND n.id NOT IN (
+                    SELECT novel_id FROM favorites WHERE user_id = ?
+                    UNION
+                    SELECT novel_id FROM bookmarks WHERE user_id = ?
+                )
+                AND n.id IN (
+                    SELECT DISTINCT ng2.novel_id FROM novel_genres ng2
+                    WHERE ng2.genre_id IN (
+                        SELECT ng.genre_id FROM novel_genres ng
+                        INNER JOIN favorites f ON f.novel_id = ng.novel_id
+                        WHERE f.user_id = ?
+                    )
+                )
+                ORDER BY n.rating_avg DESC
+                LIMIT ?
+            ");
+            $stmt->bindValue(1, $lang, PDO::PARAM_STR);
+            $stmt->bindValue(2, $userId, PDO::PARAM_INT);
+            $stmt->bindValue(3, $userId, PDO::PARAM_INT);
+            $stmt->bindValue(4, $userId, PDO::PARAM_INT);
+            $stmt->bindValue(5, 8, PDO::PARAM_INT);
+            $stmt->execute();
+            $recommendedRows = $stmt->fetchAll();
+        }
+        if (empty($recommendedRows)) {
+            $recommendedRows = $fetch('ORDER BY n.rating_avg DESC, n.rating_count DESC', 8);
+        }
+
+        $byNovelId = [];
+        foreach (array_merge(
+            $featuredRows,
+            $trendingRows,
+            $latestRows,
+            $recommendedRows,
+            $newRows,
+            $completedRows
+        ) as $row) {
+            $byNovelId[(int) $row['novel_id']] = $row;
+        }
+
+        $hydratedList = self::hydrate(array_values($byNovelId), $userId);
+        $shapeByNovelId = [];
+        foreach ($hydratedList as $novel) {
+            $shapeByNovelId[(int) $novel['id']] = $novel;
+        }
+
+        $mapSection = static function (array $rows) use ($shapeByNovelId): array {
+            $out = [];
+            foreach ($rows as $row) {
+                $id = (int) $row['novel_id'];
+                if (isset($shapeByNovelId[$id])) {
+                    $out[] = $shapeByNovelId[$id];
+                }
+            }
+            return $out;
+        };
+
+        return [
+            'featured' => $mapSection($featuredRows),
+            'trending' => $mapSection($trendingRows),
+            'latestUpdates' => $mapSection($latestRows),
+            'recommended' => $mapSection($recommendedRows),
+            'newReleases' => $mapSection($newRows),
+            'completed' => $mapSection($completedRows),
+            'continueReading' => $userId ? self::getContinueReading($userId) : [],
+        ];
+    }
+
     public static function getByGenre(string $genreSlug, string $lang, int $page = 1, int $perPage = 20, ?int $userId = null): array
     {
         $pdo = Database::connection();
@@ -373,7 +467,6 @@ class Novel
         return $result;
     }
 
-    /** Looks up a novel by its translation slug or translation id, for the language that slug belongs to. */
     /**
      * Looks up a novel either by its numeric novel id (language-agnostic — resolves to
      * whichever translation matches $lang) or by a translation's slug (language-specific,
@@ -403,8 +496,6 @@ class Novel
             return null;
         }
 
-        // NEW: each successful detail lookup counts as a view. Simple fire-and-forget
-        // increment — no dedup/rate-limiting.
         $pdo->prepare("UPDATE novels SET views_count = views_count + 1 WHERE id = ?")->execute([$row['novel_id']]);
         $row['views_count'] = (int) $row['views_count'] + 1;
 
