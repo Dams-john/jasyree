@@ -84,16 +84,8 @@ class HomeController
         $userId = AuthMiddleware::optionalUserId();
         $lang = $this->lang();
 
-        $data = [
-            'banners' => $this->bannersData(),
-            'featured' => Novel::getFeatured($lang, 4, $userId),
-            'trending' => Novel::getTrending($lang, 8, $userId),
-            'latestUpdates' => Novel::getLatestUpdates($lang, 10, $userId),
-            'recommended' => Novel::getRecommended($lang, 8, $userId),
-            'newReleases' => Novel::getNewReleases($lang, 10, $userId),
-            'completed' => Novel::getCompleted($lang, 10, $userId),
-            'continueReading' => $userId ? Novel::getContinueReading($userId) : [],
-        ];
+        $data = Novel::getHomeData($lang, $userId);
+        $data['banners'] = $this->bannersData();
 
         Response::success($data);
     }
