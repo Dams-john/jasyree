@@ -30,12 +30,44 @@ class NovelController
         $userId = AuthMiddleware::optionalUserId();
         $lang = $_GET['lang'] ?? Novel::DEFAULT_LANGUAGE;
 
+        $cacheFile = null;
+        if (!$userId) {
+            $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $idOrSlug . '_' . $lang);
+            $cacheFile = sys_get_temp_dir() . '/jasyre_novel_' . $safe . '.json';
+            $ttl = 60;
+            if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+                $cached = file_get_contents($cacheFile);
+                if ($cached !== false) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    header('X-Novel-Cache: HIT');
+                    echo $cached;
+                    return;
+                }
+            }
+        }
+
         $novel = Novel::findBySlugOrId($idOrSlug, $lang, $userId);
         if (!$novel) {
             Response::error('Novel not found.', 404);
         }
 
         $novel['availableLanguages'] = Novel::getAvailableLanguages($novel['id']);
+
+        if ($cacheFile) {
+            $payload = json_encode([
+                'success' => true,
+                'message' => 'OK',
+                'data' => $novel,
+            ], JSON_UNESCAPED_UNICODE);
+            if ($payload !== false) {
+                @file_put_contents($cacheFile, $payload, LOCK_EX);
+                header('Content-Type: application/json; charset=utf-8');
+                header('X-Novel-Cache: MISS');
+                echo $payload;
+                return;
+            }
+        }
+
         Response::success($novel);
     }
 
