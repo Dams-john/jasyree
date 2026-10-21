@@ -80,46 +80,39 @@ class HomeController
 
     /** GET /api/home?lang=en — cached aggregate homepage payload */
     public function index(): void
-    {
-        $userId = AuthMiddleware::optionalUserId();
-        $lang = $this->lang();
+{
+    // Ignore userId for the heavy home payload — cards don't need personal flags for launch speed
+    $lang = $this->lang();
+    $cacheFile = sys_get_temp_dir() . '/jasyre_home_' . $lang . '.json';
+    $ttl = 300; // 5 minutes
 
-        // Anonymous traffic shares one cache key; logged-in users skip cache (personal flags).
-        $cacheKey = $userId ? null : ('home_' . $lang);
-        $cacheFile = $cacheKey
-            ? sys_get_temp_dir() . '/jasyre_' . $cacheKey . '.json'
-            : null;
-        $ttl = 45; // seconds
-
-        if ($cacheFile && is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
-            $cached = file_get_contents($cacheFile);
-            if ($cached !== false) {
-                header('Content-Type: application/json; charset=utf-8');
-                header('X-Home-Cache: HIT');
-                echo $cached;
-                return;
-            }
+    if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+        $cached = file_get_contents($cacheFile);
+        if ($cached !== false) {
+            header('Content-Type: application/json; charset=utf-8');
+            header('X-Home-Cache: HIT');
+            echo $cached;
+            return;
         }
+    }
 
-        $data = Novel::getHomeData($lang, $userId);
-        $data['banners'] = $this->bannersData();
+    $data = Novel::getHomeData($lang, null); // always public shape
+    $data['banners'] = $this->bannersData();
 
-        if ($cacheFile) {
-            $payload = json_encode([
-                'success' => true,
-                'message' => 'OK',
-                'data' => $data,
-            ], JSON_UNESCAPED_UNICODE);
-            if ($payload !== false) {
-                @file_put_contents($cacheFile, $payload, LOCK_EX);
-                header('Content-Type: application/json; charset=utf-8');
-                header('X-Home-Cache: MISS');
-                echo $payload;
-                return;
-            }
-        }
-
-        Response::success($data);
+    $payload = json_encode([
+        'success' => true,
+        'message' => 'OK',
+        'data' => $data,
+    ], JSON_UNESCAPED_UNICODE);
+    if ($payload !== false) {
+        @file_put_contents($cacheFile, $payload, LOCK_EX);
+        header('Content-Type: application/json; charset=utf-8');
+        header('X-Home-Cache: MISS');
+        echo $payload;
+        return;
+    }
+    Response::success($data);
+}
     }
     private function bannersData(): array
     {
