@@ -537,8 +537,12 @@ class Novel
             return null;
         }
 
-        $pdo->prepare("UPDATE novels SET views_count = views_count + 1 WHERE id = ?")->execute([$row['novel_id']]);
-        $row['views_count'] = (int) $row['views_count'] + 1;
+        try {
+            $pdo->prepare("UPDATE novels SET views_count = views_count + 1 WHERE id = ?")
+                ->execute([$row['novel_id']]);
+            $row['views_count'] = (int) $row['views_count'] + 1;
+        } catch (Throwable $e) {
+        }
 
         $rows = self::attachGenresAndTags([$row]);
         $rows = self::attachLikeCounts($rows);
