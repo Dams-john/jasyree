@@ -78,6 +78,23 @@ class NovelController
         $lang = $_GET['lang'] ?? Novel::DEFAULT_LANGUAGE;
         $pdo = Database::connection();
 
+        // Guests only — logged-in users need isRead / isUnlocked
+        $cacheFile = null;
+        if (!$userId) {
+            $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $idOrSlug . '_' . $lang . '_ch');
+            $cacheFile = sys_get_temp_dir() . '/jasyre_chapters_' . $safe . '.json';
+            $ttl = 60;
+            if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+                $cached = file_get_contents($cacheFile);
+                if ($cached !== false) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    header('X-Chapters-Cache: HIT');
+                    echo $cached;
+                    return;
+                }
+            }
+        }
+
         $translationId = $this->resolveTranslationId($idOrSlug, $lang);
         if (!$translationId) {
             Response::error('Novel not found.', 404);
@@ -125,9 +142,24 @@ class NovelController
             ];
         }, $chapters);
 
-        Response::success($result);
-    }
+        if ($cacheFile) {
+            $payload = json_encode([
+                'success' => true,
+                'message' => 'OK',
+                'data' => $result,
+            ], JSON_UNESCAPED_UNICODE);
+            if ($payload !== false) {
+                @file_put_contents($cacheFile, $payload, LOCK_EX);
+                header('Content-Type: application/json; charset=utf-8');
+                header('X-Chapters-Cache: MISS');
+                echo $payload;
+                return;
+            }
+        }
 
+        Response::success($result);
+}
+    
     /** GET /api/chapters/{id} — full chapter incl. content, for the reader */
     public function chapterContent(string $id): void
     {
