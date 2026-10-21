@@ -30,42 +30,40 @@ class NovelController
         $userId = AuthMiddleware::optionalUserId();
         $lang = $_GET['lang'] ?? Novel::DEFAULT_LANGUAGE;
 
-        $cacheFile = null;
-        if (!$userId) {
-            $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $idOrSlug . '_' . $lang);
-            $cacheFile = sys_get_temp_dir() . '/jasyre_novel_' . $safe . '.json';
-            $ttl = 60;
-            if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
-                $cached = file_get_contents($cacheFile);
-                if ($cached !== false) {
-                    header('Content-Type: application/json; charset=utf-8');
-                    header('X-Novel-Cache: HIT');
-                    echo $cached;
-                    return;
-                }
+        // Public novel payload cached for everyone (logged-in too)
+        $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $idOrSlug . '_' . $lang);
+        $cacheFile = sys_get_temp_dir() . '/jasyre_novel_' . $safe . '.json';
+        $ttl = 300;
+
+        if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+            $cached = file_get_contents($cacheFile);
+            if ($cached !== false) {
+                header('Content-Type: application/json; charset=utf-8');
+                header('X-Novel-Cache: HIT');
+                echo $cached;
+                return;
             }
         }
 
-        $novel = Novel::findBySlugOrId($idOrSlug, $lang, $userId);
+        // null userId = public shape (no per-user flags slowing the heavy query)
+        $novel = Novel::findBySlugOrId($idOrSlug, $lang, null);
         if (!$novel) {
             Response::error('Novel not found.', 404);
         }
 
         $novel['availableLanguages'] = Novel::getAvailableLanguages($novel['id']);
 
-        if ($cacheFile) {
-            $payload = json_encode([
-                'success' => true,
-                'message' => 'OK',
-                'data' => $novel,
-            ], JSON_UNESCAPED_UNICODE);
-            if ($payload !== false) {
-                @file_put_contents($cacheFile, $payload, LOCK_EX);
-                header('Content-Type: application/json; charset=utf-8');
-                header('X-Novel-Cache: MISS');
-                echo $payload;
-                return;
-            }
+        $payload = json_encode([
+            'success' => true,
+            'message' => 'OK',
+            'data' => $novel,
+        ], JSON_UNESCAPED_UNICODE);
+        if ($payload !== false) {
+            @file_put_contents($cacheFile, $payload, LOCK_EX);
+            header('Content-Type: application/json; charset=utf-8');
+            header('X-Novel-Cache: MISS');
+            echo $payload;
+            return;
         }
 
         Response::success($novel);
@@ -78,56 +76,68 @@ class NovelController
         $lang = $_GET['lang'] ?? Novel::DEFAULT_LANGUAGE;
         $pdo = Database::connection();
 
-        // Guests only — logged-in users need isRead / isUnlocked
-        $cacheFile = null;
-        if (!$userId) {
-            $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $idOrSlug . '_' . $lang . '_ch');
-            $cacheFile = sys_get_temp_dir() . '/jasyre_chapters_' . $safe . '.json';
-            $ttl = 60;
-            if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
-                $cached = file_get_contents($cacheFile);
-                if ($cached !== false) {
-                    header('Content-Type: application/json; charset=utf-8');
+        $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $idOrSlug . '_' . $lang . '_ch');
+        $cacheFile = sys_get_temp_dir() . '/jasyre_chapters_' . $safe . '.json';
+        $ttl = 300;
+
+        $chapters = null;
+        if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+            $raw = file_get_contents($cacheFile);
+            if ($raw !== false) {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded) && isset($decoded['rows'], $decoded['translationId'])) {
+                    $chapters = $decoded['rows'];
+                    $translationId = (int) $decoded['translationId'];
                     header('X-Chapters-Cache: HIT');
-                    echo $cached;
-                    return;
                 }
             }
         }
 
-        $translationId = $this->resolveTranslationId($idOrSlug, $lang);
-        if (!$translationId) {
-            Response::error('Novel not found.', 404);
-        }
+        if ($chapters === null) {
+            $translationId = $this->resolveTranslationId($idOrSlug, $lang);
+            if (!$translationId) {
+                Response::error('Novel not found.', 404);
+            }
 
-        // Only chapters that are published AND whose scheduled publish time has passed.
-        $stmt = $pdo->prepare("
-            SELECT id, number, title, published_at, word_count, is_premium, coin_cost
-            FROM chapters
-            WHERE novel_translation_id = ? AND publish_status = 'published' AND published_at <= NOW()
-            ORDER BY number ASC
-        ");
-        $stmt->execute([$translationId]);
-        $chapters = $stmt->fetchAll();
+            $stmt = $pdo->prepare("
+                SELECT id, number, title, published_at, word_count, is_premium, coin_cost
+                FROM chapters
+                WHERE novel_translation_id = ?
+                  AND publish_status = 'published'
+                  AND published_at <= NOW()
+                ORDER BY number ASC
+            ");
+            $stmt->execute([$translationId]);
+            $chapters = $stmt->fetchAll();
+
+            @file_put_contents($cacheFile, json_encode([
+                'translationId' => $translationId,
+                'rows' => $chapters,
+            ], JSON_UNESCAPED_UNICODE), LOCK_EX);
+            header('X-Chapters-Cache: MISS');
+        }
 
         $readChapterIds = [];
         $unlockedChapterIds = [];
-        if ($userId) {
+        if ($userId && !empty($chapters)) {
             $ids = array_column($chapters, 'id');
-            if (!empty($ids)) {
-                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-                $readStmt = $pdo->prepare("SELECT chapter_id FROM chapter_reads WHERE user_id = ? AND chapter_id IN ($placeholders)");
-                $readStmt->execute([$userId, ...$ids]);
-                $readChapterIds = array_column($readStmt->fetchAll(), 'chapter_id');
+            $readStmt = $pdo->prepare(
+                "SELECT chapter_id FROM chapter_reads WHERE user_id = ? AND chapter_id IN ($placeholders)"
+            );
+            $readStmt->execute([$userId, ...$ids]);
+            $readChapterIds = array_column($readStmt->fetchAll(), 'chapter_id');
 
-                $unlockStmt = $pdo->prepare("SELECT chapter_id FROM chapter_unlocks WHERE user_id = ? AND chapter_id IN ($placeholders)");
-                $unlockStmt->execute([$userId, ...$ids]);
-                $unlockedChapterIds = array_column($unlockStmt->fetchAll(), 'chapter_id');
-            }
+            $unlockStmt = $pdo->prepare(
+                "SELECT chapter_id FROM chapter_unlocks WHERE user_id = ? AND chapter_id IN ($placeholders)"
+            );
+            $unlockStmt->execute([$userId, ...$ids]);
+            $unlockedChapterIds = array_column($unlockStmt->fetchAll(), 'chapter_id');
         }
 
         $result = array_map(function ($row) use ($readChapterIds, $unlockedChapterIds, $translationId) {
+            $isPremium = (bool) $row['is_premium'];
             return [
                 'id' => (int) $row['id'],
                 'novelTranslationId' => (int) $translationId,
@@ -135,31 +145,16 @@ class NovelController
                 'title' => $row['title'],
                 'publishedAt' => $row['published_at'],
                 'wordCount' => (int) $row['word_count'],
-                'isPremium' => (bool) $row['is_premium'],
+                'isPremium' => $isPremium,
                 'isRead' => in_array($row['id'], $readChapterIds),
-                'isUnlocked' => !$row['is_premium'] || in_array($row['id'], $unlockedChapterIds),
+                'isUnlocked' => !$isPremium || in_array($row['id'], $unlockedChapterIds),
                 'coinCost' => (int) $row['coin_cost'],
             ];
         }, $chapters);
 
-        if ($cacheFile) {
-            $payload = json_encode([
-                'success' => true,
-                'message' => 'OK',
-                'data' => $result,
-            ], JSON_UNESCAPED_UNICODE);
-            if ($payload !== false) {
-                @file_put_contents($cacheFile, $payload, LOCK_EX);
-                header('Content-Type: application/json; charset=utf-8');
-                header('X-Chapters-Cache: MISS');
-                echo $payload;
-                return;
-            }
-        }
-
         Response::success($result);
-}
-    
+    }
+
     /** GET /api/chapters/{id} — full chapter incl. content, for the reader */
     public function chapterContent(string $id): void
     {
@@ -180,13 +175,18 @@ class NovelController
 
         $isUnlocked = !$chapter['is_premium'];
         if (!$isUnlocked && $userId) {
-            $unlockStmt = $pdo->prepare("SELECT 1 FROM chapter_unlocks WHERE user_id = ? AND chapter_id = ?");
+            $unlockStmt = $pdo->prepare(
+                "SELECT 1 FROM chapter_unlocks WHERE user_id = ? AND chapter_id = ?"
+            );
             $unlockStmt->execute([$userId, $chapter['id']]);
             $isUnlocked = (bool) $unlockStmt->fetch();
         }
 
         if (!$isUnlocked) {
-            Response::error('This chapter is locked.', 403, ['isPremium' => true, 'coinCost' => (int) $chapter['coin_cost']]);
+            Response::error('This chapter is locked.', 403, [
+                'isPremium' => true,
+                'coinCost' => (int) $chapter['coin_cost'],
+            ]);
         }
 
         Response::success([
@@ -219,7 +219,9 @@ class NovelController
             Response::success(['alreadyFree' => true], 'Chapter is free.');
         }
 
-        $check = $pdo->prepare("SELECT 1 FROM chapter_unlocks WHERE user_id = ? AND chapter_id = ?");
+        $check = $pdo->prepare(
+            "SELECT 1 FROM chapter_unlocks WHERE user_id = ? AND chapter_id = ?"
+        );
         $check->execute([$userId, $chapter['id']]);
         if ($check->fetch()) {
             Response::success(['alreadyUnlocked' => true], 'Already unlocked.');
@@ -288,7 +290,9 @@ class NovelController
             ");
             $stmt->execute([$identifier, $lang]);
         } else {
-            $stmt = $pdo->prepare("SELECT id FROM novel_translations WHERE slug = ? AND publish_status = 'published'");
+            $stmt = $pdo->prepare(
+                "SELECT id FROM novel_translations WHERE slug = ? AND publish_status = 'published'"
+            );
             $stmt->execute([$identifier]);
         }
         $row = $stmt->fetch();
