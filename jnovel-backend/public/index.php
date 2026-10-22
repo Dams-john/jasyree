@@ -201,6 +201,7 @@ $routes = [
     ['PUT',  '/api/admin/coin-packages/{id}', [AdminController::class, 'updateCoinPackage']],
     ['GET',  '/api/admin/subscription-plans', [AdminController::class, 'listSubscriptionPlans']],
     ['PUT',  '/api/admin/subscription-plans/{id}', [AdminController::class, 'updateSubscriptionPlan']],
+    ['POST', '/api/admin/uploads/cover', [AdminController::class, 'uploadCover']],
 ];
 
 foreach ($routes as [$routeMethod, $pattern, $handler]) {
