@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Eye, Search, Upload, Pencil, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Eye, Search, Upload, Pencil, Trash2, ImagePlus, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { adminApi, AdminNovelListItem, PenName, Tag, genreApi } from '../../lib/resources';
 import { ApiError } from '../../lib/api';
@@ -24,6 +24,9 @@ export default function AdminNovels() {
   const [status, setStatus] = useState('ongoing');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const addCoverRef = useRef<HTMLInputElement>(null);
+
   const [publishingId, setPublishingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -37,6 +40,8 @@ export default function AdminNovels() {
   const [editError, setEditError] = useState('');
   const [editTagIds, setEditTagIds] = useState<number[]>([]);
   const [editGenreIds, setEditGenreIds] = useState<number[]>([]);
+  const [uploadingEditCover, setUploadingEditCover] = useState(false);
+  const editCoverRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
     setLoading(true);
@@ -81,6 +86,32 @@ export default function AdminNovels() {
     setSelectedGenreIds(prev =>
       prev.includes(genreId) ? prev.filter(id => id !== genreId) : [...prev, genreId]
     );
+  };
+
+  const uploadCoverFile = async (
+    file: File,
+    setUrl: (url: string) => void,
+    setBusy: (v: boolean) => void,
+    setErr: (msg: string) => void
+  ) => {
+    if (!file.type.startsWith('image/')) {
+      setErr('Cover must be an image (PNG, JPG, JPEG, GIF, or WebP).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setErr('Cover must be smaller than 2MB.');
+      return;
+    }
+    setBusy(true);
+    setErr('');
+    try {
+      const { url } = await adminApi.uploadCover(file);
+      setUrl(url);
+    } catch (err) {
+      setErr(err instanceof ApiError ? err.message : 'Cover upload failed.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -196,6 +227,88 @@ export default function AdminNovels() {
       setDeletingId(null);
     }
   };
+
+  const CoverPicker = ({
+    value,
+    onChange,
+    uploading,
+    inputRef,
+    onFile,
+    onClear,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    uploading: boolean;
+    inputRef: React.RefObject<HTMLInputElement | null>;
+    onFile: (file: File) => void;
+    onClear: () => void;
+  }) => (
+    <div className="space-y-2">
+      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400">
+        Cover image
+      </label>
+      <div className="flex gap-3 items-start">
+        <div className="relative w-20 h-28 shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          {value ? (
+            <>
+              <img src={value} alt="Cover" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={onClear}
+                className="absolute top-1 right-1 p-0.5 rounded-full bg-black/60 text-white"
+                title="Remove cover"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <ImagePlus className="w-6 h-6" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 space-y-2 min-w-0">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+            className="hidden"
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) onFile(f);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+            className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {uploading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+                Uploading…
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                Upload from device
+              </>
+            )}
+          </button>
+          <input
+            type="url"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Or paste image URL"
+            className="input-field text-sm"
+          />
+          <p className="text-[11px] text-gray-400">PNG, JPG, GIF or WebP · max 2MB · 9:16 recommended</p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-6xl space-y-5">
@@ -357,15 +470,44 @@ export default function AdminNovels() {
               )}
             </div>
             <div className="px-5 py-3 space-y-3 overflow-y-auto flex-1 min-h-0">
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Novel Title" className="input-field" required />
-              <select value={penNameId} onChange={e => setPenNameId(e.target.value ? Number(e.target.value) : '')} className="input-field" required>
+              <CoverPicker
+                value={cover}
+                onChange={setCover}
+                uploading={uploadingCover}
+                inputRef={addCoverRef}
+                onFile={file =>
+                  uploadCoverFile(file, setCover, setUploadingCover, setFormError)
+                }
+                onClear={() => setCover('')}
+              />
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Novel Title"
+                className="input-field"
+                required
+              />
+              <select
+                value={penNameId}
+                onChange={e => setPenNameId(e.target.value ? Number(e.target.value) : '')}
+                className="input-field"
+                required
+              >
                 <option value="">Select Pen Name…</option>
                 {penNames.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
-              <textarea value={synopsis} onChange={e => setSynopsis(e.target.value)} placeholder="Synopsis" className="input-field resize-none h-24" required />
-              <input type="url" value={cover} onChange={e => setCover(e.target.value)} placeholder="Cover image URL (optional)" className="input-field" />
+              <textarea
+                value={synopsis}
+                onChange={e => setSynopsis(e.target.value)}
+                placeholder="Synopsis"
+                className="input-field resize-none h-24"
+                required
+              />
               <select value={status} onChange={e => setStatus(e.target.value)} className="input-field">
                 <option value="ongoing">Ongoing</option>
                 <option value="completed">Completed</option>
@@ -373,11 +515,21 @@ export default function AdminNovels() {
               </select>
               {availableGenres.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Genres (pick one or more)</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                    Genres (pick one or more)
+                  </label>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableGenres.map(g => (
-                      <button key={g.id} type="button" onClick={() => toggleGenre(g.id)}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedGenreIds.includes(g.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => toggleGenre(g.id)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          selectedGenreIds.includes(g.id)
+                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
+                        }`}
+                      >
                         {g.name}
                       </button>
                     ))}
@@ -386,11 +538,21 @@ export default function AdminNovels() {
               )}
               {availableTags.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Select Tags</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                    Select Tags
+                  </label>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableTags.map(tag => (
-                      <button key={tag.id} type="button" onClick={() => toggleTag(tag.id)}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedTagIds.includes(tag.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          selectedTagIds.includes(tag.id)
+                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
+                        }`}
+                      >
                         #{tag.name}
                       </button>
                     ))}
@@ -398,12 +560,26 @@ export default function AdminNovels() {
                 </div>
               )}
               {penNames.length === 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">You need a pen name first — add one under Pen Names.</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  You need a pen name first — add one under Pen Names.
+                </p>
               )}
             </div>
             <div className="flex gap-3 p-4 pt-3 shrink-0 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1e1e32]">
-              <button type="button" onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
-              <button type="submit" disabled={submitting || penNames.length === 0} className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50">{submitting ? 'Adding…' : 'Add Novel'}</button>
+              <button
+                type="button"
+                onClick={() => setShowAdd(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || uploadingCover || penNames.length === 0}
+                className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
+              >
+                {submitting ? 'Adding…' : 'Add Novel'}
+              </button>
             </div>
           </form>
         </div>
@@ -411,28 +587,74 @@ export default function AdminNovels() {
 
       {editingNovelId !== null && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <form onSubmit={handleEdit} className="bg-white dark:bg-[#1e1e32] rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[min(90vh,720px)] overflow-y-auto p-6 shadow-xl">
+          <form
+            onSubmit={handleEdit}
+            className="bg-white dark:bg-[#1e1e32] rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[min(90vh,720px)] overflow-y-auto p-6 shadow-xl"
+          >
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Edit Novel</h3>
             {editError && (
-              <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">{editError}</div>
+              <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
+                {editError}
+              </div>
             )}
             <div className="space-y-3">
-              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Novel Title" className="input-field" required />
-              <textarea value={editSynopsis} onChange={e => setEditSynopsis(e.target.value)} placeholder="Synopsis" className="input-field resize-none h-24" required />
-              <input type="url" value={editCover} onChange={e => setEditCover(e.target.value)} placeholder="Cover image URL (optional)" className="input-field" />
-              <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="input-field">
+              <CoverPicker
+                value={editCover}
+                onChange={setEditCover}
+                uploading={uploadingEditCover}
+                inputRef={editCoverRef}
+                onFile={file =>
+                  uploadCoverFile(file, setEditCover, setUploadingEditCover, setEditError)
+                }
+                onClear={() => setEditCover('')}
+              />
+              <input
+                type="text"
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                placeholder="Novel Title"
+                className="input-field"
+                required
+              />
+              <textarea
+                value={editSynopsis}
+                onChange={e => setEditSynopsis(e.target.value)}
+                placeholder="Synopsis"
+                className="input-field resize-none h-24"
+                required
+              />
+              <select
+                value={editStatus}
+                onChange={e => setEditStatus(e.target.value)}
+                className="input-field"
+              >
                 <option value="ongoing">Ongoing</option>
                 <option value="completed">Completed</option>
                 <option value="hiatus">Hiatus</option>
               </select>
               {availableGenres.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Genres</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                    Genres
+                  </label>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableGenres.map(g => (
-                      <button key={g.id} type="button"
-                        onClick={() => setEditGenreIds(prev => prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id])}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${editGenreIds.includes(g.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() =>
+                          setEditGenreIds(prev =>
+                            prev.includes(g.id)
+                              ? prev.filter(id => id !== g.id)
+                              : [...prev, g.id]
+                          )
+                        }
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          editGenreIds.includes(g.id)
+                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
+                        }`}
+                      >
                         {g.name}
                       </button>
                     ))}
@@ -441,12 +663,27 @@ export default function AdminNovels() {
               )}
               {availableTags.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Tags</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                    Tags
+                  </label>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
                     {availableTags.map(tag => (
-                      <button key={tag.id} type="button"
-                        onClick={() => setEditTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${editTagIds.includes(tag.id) ? 'bg-[#e91e8c] text-white border-[#e91e8c]' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'}`}>
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() =>
+                          setEditTagIds(prev =>
+                            prev.includes(tag.id)
+                              ? prev.filter(id => id !== tag.id)
+                              : [...prev, tag.id]
+                          )
+                        }
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          editTagIds.includes(tag.id)
+                            ? 'bg-[#e91e8c] text-white border-[#e91e8c]'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent'
+                        }`}
+                      >
                         #{tag.name}
                       </button>
                     ))}
@@ -455,9 +692,21 @@ export default function AdminNovels() {
               )}
             </div>
             <div className="flex gap-3 mt-5">
-              <button type="button" onClick={() => { setEditingNovelId(null); setEditTranslationId(null); }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
-              <button type="submit" disabled={editSubmitting} className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingNovelId(null);
+                  setEditTranslationId(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={editSubmitting || uploadingEditCover}
+                className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
+              >
                 {editSubmitting ? 'Saving…' : 'Save'}
               </button>
             </div>
