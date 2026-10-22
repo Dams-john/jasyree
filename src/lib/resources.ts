@@ -299,6 +299,14 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  uploadCover: (file: File) => {
+  const form = new FormData();
+  form.append('cover', file);
+  return apiFetch<{ url: string }>('/admin/uploads/cover', {
+    method: 'POST',
+    body: form,
+  });
+},
 
   updateNovelGenres: (id: number, genreIds: number[]) =>
     apiFetch<null>(`/admin/novels/${id}/genres`, {
