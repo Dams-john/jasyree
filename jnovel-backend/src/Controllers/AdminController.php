@@ -77,6 +77,56 @@ class AdminController
         ], $novels));
     }
 
+    /** POST /api/admin/uploads/cover — multipart field name: cover */
+public function uploadCover(): void
+{
+    AuthMiddleware::requireRole(['author', 'admin']);
+
+    if (empty($_FILES['cover']) || !is_uploaded_file($_FILES['cover']['tmp_name'])) {
+        Response::error('No cover file uploaded. Use form field name "cover".', 422);
+    }
+
+    $file = $_FILES['cover'];
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        Response::error('Upload failed.', 422);
+    }
+
+    $maxBytes = 2 * 1024 * 1024; // 2MB
+    if (($file['size'] ?? 0) > $maxBytes) {
+        Response::error('Cover must be smaller than 2MB.', 422);
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($file['tmp_name']) ?: '';
+    $allowed = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+        'image/webp' => 'webp',
+    ];
+    if (!isset($allowed[$mime])) {
+        Response::error('Cover must be PNG, JPG, GIF, or WebP.', 422);
+    }
+
+    $ext = $allowed[$mime];
+    $dir = __DIR__ . '/../../public/uploads/covers';
+    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+        Response::error('Could not create upload directory.', 500);
+    }
+
+    $name = bin2hex(random_bytes(16)) . '.' . $ext;
+    $dest = $dir . '/' . $name;
+    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+        Response::error('Failed to save cover.', 500);
+    }
+
+    // Public URL — adjust if your API serves static files differently
+    $base = rtrim((string) (getenv('APP_URL') ?: 'https://api.jasyre.com'), '/');
+    $url = $base . '/uploads/covers/' . $name;
+
+    Response::success(['url' => $url], 'Cover uploaded.', 201);
+}
+
     public function showNovel(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
