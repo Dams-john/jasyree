@@ -8,8 +8,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { genreApi } from '../lib/resources';
 import { ApiError } from '../lib/api';
 
-/** Public genres only (Miss J list). Hidden: LGBTQ+, Vampire, Thriller, Historical Fiction, Science Fiction */
-const ALLOWED_SLUGS = [
+/** Public only. Hidden: LGBTQ+, Vampire, Thriller, Historical Fiction, Science Fiction + any old junk */
+const ALLOWED_SLUGS = new Set([
   'werewolf',
   'billionaire',
   'romance',
@@ -26,7 +26,7 @@ const ALLOWED_SLUGS = [
   'short-story',
   'mystery',
   'game',
-];
+]);
 
 const ORDER = [
   'werewolf',
@@ -72,7 +72,7 @@ export default function GenresPage() {
       .then(res => {
         if (cancelled) return;
         const filtered = res
-          .filter(g => ALLOWED_SLUGS.includes(normalizeSlug(g)))
+          .filter(g => ALLOWED_SLUGS.has(normalizeSlug(g)))
           .sort((a, b) => {
             const ia = ORDER.indexOf(normalizeSlug(a));
             const ib = ORDER.indexOf(normalizeSlug(b));
@@ -144,7 +144,9 @@ export default function GenresPage() {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-12 text-center text-gray-500 dark:text-gray-400">{error}</div>
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+        {error}
+      </div>
     );
   }
 
@@ -155,6 +157,7 @@ export default function GenresPage() {
       <div className="max-w-4xl mx-auto pb-8">
         <div className="sticky top-14 z-30 bg-gray-50 dark:bg-[#0f0f1a] px-4 h-12 flex items-center gap-3 border-b border-gray-100 dark:border-gray-800">
           <button
+            type="button"
             onClick={() => navigate('/genres')}
             className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
@@ -171,7 +174,7 @@ export default function GenresPage() {
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-              style={{ background: `${genre?.color || '#e91e8c'}20` }}
+              style={{ background: `${genre?.color || '#e91e8c'}22` }}
             >
               {genre?.icon || '📚'}
             </div>
@@ -201,36 +204,29 @@ export default function GenresPage() {
     <div className="max-w-4xl mx-auto px-4 py-6 pb-8">
       <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6">{t.genres}</h1>
 
+      {/* Clean cards — no broken placard images */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-8">
         {visibleGenres.map(g => {
-          const hasCover = Boolean(g.cover && String(g.cover).trim());
           const bg = g.color || '#e91e8c';
           return (
             <button
               key={g.id}
               type="button"
               onClick={() => navigate(`/genres/${g.id}`)}
-              className="relative overflow-hidden rounded-2xl aspect-video flex items-end p-3 group hover:scale-[1.02] transition-transform"
-              style={!hasCover ? { background: `linear-gradient(135deg, ${bg}cc, ${bg}66)` } : undefined}
+              className="rounded-2xl p-4 text-left border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1e1e32] hover:border-[#e91e8c]/40 hover:shadow-md transition-all group"
             >
-              {hasCover && (
-                <img
-                  src={g.cover}
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover"
-                  onError={e => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-              <div className="relative">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xl">{g.icon || '📚'}</span>
-                  <span className="text-white font-bold text-sm">{g.name}</span>
-                </div>
-                <p className="text-white/70 text-xs mt-0.5">{(g.count ?? 0).toLocaleString()} novels</p>
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl mb-3"
+                style={{ background: `${bg}22` }}
+              >
+                {g.icon || '📚'}
               </div>
+              <p className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-[#e91e8c] transition-colors">
+                {g.name}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {(g.count ?? 0).toLocaleString()} novels
+              </p>
             </button>
           );
         })}
