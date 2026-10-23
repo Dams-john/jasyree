@@ -125,7 +125,8 @@ export default function GenresPage() {
           filtered.map(async g => {
             try {
               const page = await genreApi.novelsByGenre(g.slug ?? String(g.id), 1, 1);
-              return [g.id, page.total] as const;
+              const total = page.items.length === 0 ? 0 : page.total;
+             return [g.id, total] as const;
             } catch {
               return [g.id, 0] as const;
             }
@@ -157,7 +158,8 @@ export default function GenresPage() {
       .then(res => {
         if (cancelled) return;
         setGenreNovels(prev => ({ ...prev, [genre.id]: res.items }));
-        setPublishedCounts(prev => ({ ...prev, [genre.id]: res.total }));
+        const total = res.items.length === 0 ? 0 : res.total;
+        setPublishedCounts(prev => ({ ...prev, [genre.id]: total }));
       })
       .catch(() => {});
     return () => {
