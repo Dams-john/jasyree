@@ -311,7 +311,7 @@ export default function GenresPage() {
                 {g.name}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {n === undefined ? '…' : `\( {n.toLocaleString()} novel \){n === 1 ? '' : 's'}`}
+                {n === undefined ? '…' : `${n.toLocaleString()} novel${n === 1 ? '' : 's'}`}
               </p>
             </button>
           );
