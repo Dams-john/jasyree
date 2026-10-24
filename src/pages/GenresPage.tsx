@@ -114,7 +114,7 @@ export default function GenresPage() {
       .list()
       .then(res => {
         if (cancelled) return;
-        const list = (Array.isArray(res ? res : []) as Genre[];
+        const list = (Array.isArray(res) ? res : []) as Genre[];
         const filtered = list
           .filter(g => ALLOWED_SLUGS.has(normalizeSlug(g)))
           .sort((a, b) => {
@@ -319,4 +319,4 @@ export default function GenresPage() {
       </div>
     </div>
   );
-  }
+}
