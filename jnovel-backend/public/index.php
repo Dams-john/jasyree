@@ -10,6 +10,37 @@ if (php_sapi_name() === 'cli-server') {
     }
 }
 
+// ---- Serve uploaded files (covers, etc.) ----
+$uploadUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+if (is_string($uploadUri) && str_starts_with($uploadUri, '/uploads/')) {
+    // Try common locations (public/ next to index, or project public/)
+    $candidates = [
+        __DIR__ . $uploadUri,
+        dirname(__DIR__) . '/public' . $uploadUri,
+        __DIR__ . '/public' . $uploadUri,
+    ];
+    $file = null;
+    foreach ($candidates as $path) {
+        $real = realpath($path);
+        if ($real && is_file($real)) {
+            $file = $real;
+            break;
+        }
+    }
+    if ($file) {
+        $mime = mime_content_type($file) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . (string) filesize($file));
+        header('Cache-Control: public, max-age=604800');
+        readfile($file);
+        exit;
+    }
+    http_response_code(404);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'File not found']);
+    exit;
+}
+
 // ---- CORS ----
 require_once __DIR__ . '/../config/config.php';
 $config = appConfig();
