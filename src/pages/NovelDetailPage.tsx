@@ -10,6 +10,39 @@ import { ApiError } from '../lib/api';
 
 type Tab = 'chapters' | 'about' | 'comments';
 
+/** Split synopsis into paragraphs (blank lines or single newlines). */
+function SynopsisBlocks({ text, className = '' }: { text: string; className?: string }) {
+  const parts = (text || '')
+    .replace(/\r\n/g, '\n')
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  // If author only used single Enter (no blank line), still split lines into blocks
+  const blocks =
+    parts.length > 1
+      ? parts
+      : (text || '')
+          .replace(/\r\n/g, '\n')
+          .split('\n')
+          .map(p => p.trim())
+          .filter(Boolean);
+
+  if (blocks.length === 0) {
+    return <p className={className}>No synopsis yet.</p>;
+  }
+
+  return (
+    <div className={className}>
+      {blocks.map((para, i) => (
+        <p key={i} className="mb-3 last:mb-0 whitespace-pre-line">
+          {para}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export default function NovelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -127,7 +160,7 @@ export default function NovelDetailPage() {
     }
   };
 
-  const readPath = (chapterNum: number) => `/read/${id ?? novel?.id}/${chapterNum}`;
+  const readPath = (chapterNum: number) => `/read/\( {id ?? novel?.id}/ \){chapterNum}`;
 
   const handleReadChapter = (chapterNum: number, isPremium: boolean, isUnlocked?: boolean) => {
     const ch = chapters.find(c => c.number === chapterNum);
@@ -233,9 +266,9 @@ export default function NovelDetailPage() {
             </span>
           </div>
 
-          <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3 mb-4 hidden sm:block whitespace-pre-line">
-            {novel.synopsis}
-          </p>
+          <div className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3 mb-4 hidden sm:block">
+            <SynopsisBlocks text={novel.synopsis} />
+          </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -273,9 +306,10 @@ export default function NovelDetailPage() {
       </div>
 
       <div className="px-4 sm:hidden mb-4">
-        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-          {novel.synopsis}
-        </p>
+        <SynopsisBlocks
+          text={novel.synopsis}
+          className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
+        />
         <div className="flex flex-wrap gap-1.5 mt-3">
           {novel.tags.map(tag => (
             <span
@@ -376,9 +410,10 @@ export default function NovelDetailPage() {
           <div className="space-y-5 py-2">
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white mb-2">Synopsis</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-                {novel.synopsis}
-              </p>
+              <SynopsisBlocks
+                text={novel.synopsis}
+                className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
+              />
             </div>
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white mb-2">Details</h3>
