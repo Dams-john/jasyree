@@ -10,14 +10,25 @@ if (php_sapi_name() === 'cli-server') {
     }
 }
 
-// ---- Serve uploaded files (covers, etc.) ----
 $uploadUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
-if (is_string($uploadUri) && str_starts_with($uploadUri, '/uploads/')) {
-    // Try common locations (public/ next to index, or project public/)
+$uploadUri = '/' . ltrim($uploadUri, '/');
+
+// Strip script directory if API is not at domain root
+$scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+if ($scriptDir !== '' && $scriptDir !== '/' && str_starts_with($uploadUri, $scriptDir)) {
+    $uploadUri = substr($uploadUri, strlen($scriptDir)) ?: '/';
+    $uploadUri = '/' . ltrim($uploadUri, '/');
+}
+
+if (str_starts_with($uploadUri, '/api/uploads/')) {
+    $uploadUri = substr($uploadUri, 4);
+}
+
+if (str_starts_with($uploadUri, '/uploads/')) {
     $candidates = [
-        __DIR__ . $uploadUri,
-        dirname(__DIR__) . '/public' . $uploadUri,
-        __DIR__ . '/public' . $uploadUri,
+        __DIR__ . $uploadUri,                       
+        dirname(__DIR__) . '/public' . $uploadUri, 
+        dirname(__DIR__) . $uploadUri,
     ];
     $file = null;
     foreach ($candidates as $path) {
@@ -37,7 +48,7 @@ if (is_string($uploadUri) && str_starts_with($uploadUri, '/uploads/')) {
     }
     http_response_code(404);
     header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'File not found']);
+    echo json_encode(['success' => false, 'message' => 'File not found', 'path' => $uploadUri]);
     exit;
 }
 
