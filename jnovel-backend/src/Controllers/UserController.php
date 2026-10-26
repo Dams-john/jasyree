@@ -75,9 +75,8 @@ public function uploadAvatar(): void
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
         Response::error('Failed to save avatar.', 500);
     }
-
-    // Public URL — same style as cover uploads (/api/uploads/... is rewritten in index.php)
-    $url = '/api/uploads/avatars/' . $name;
+    
+    $url = 'https://api.jasyre.com/api/uploads/avatars/' . $name;
 
     User::updateProfile($userId, ['avatar' => $url]);
 
