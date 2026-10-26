@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Edit2, BookOpen, Clock, Settings, LogOut, ShieldCheck, Coins, HelpCircle, X } from 'lucide-react';
+import { Edit2, BookOpen, Clock, Settings, LogOut, ShieldCheck, Coins, HelpCircle, X, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { userApi } from '../lib/resources';
@@ -11,6 +11,8 @@ export default function ProfilePage() {
   const { user, logout, refreshUser } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
+
   const [recentlyRead, setRecentlyRead] = useState<
     { novelId: number; novelTitle: string; cover: string }[]
   >([]);
@@ -18,6 +20,7 @@ export default function ProfilePage() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState('');
 
   useEffect(() => {
@@ -42,10 +45,34 @@ export default function ProfilePage() {
     setShowAvatarModal(true);
   };
 
+  const onPickFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Avatar must be an image (PNG, JPG, GIF, or WebP).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError('Image must be smaller than 2MB.');
+      return;
+    }
+    setUploadingAvatar(true);
+    setAvatarError('');
+    try {
+      const { url } = await userApi.uploadAvatar(file);
+      setAvatarUrl(url);
+      await userApi.updateProfile({ avatar: url });
+      await refreshUser();
+      setShowAvatarModal(false);
+    } catch (err) {
+      setAvatarError(err instanceof ApiError ? err.message : 'Upload failed.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const saveAvatar = async () => {
     const url = avatarUrl.trim();
     if (!url) {
-      setAvatarError('Paste an image URL.');
+      setAvatarError('Upload a photo or paste an image URL.');
       return;
     }
     setSavingAvatar(true);
@@ -237,6 +264,7 @@ export default function ProfilePage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
             <div className="flex justify-center mb-4">
               <img
                 src={getAvatarUrl(avatarUrl || user.avatar)}
@@ -247,7 +275,39 @@ export default function ProfilePage() {
                 }}
               />
             </div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">Image URL</label>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) onPickFile(f);
+                e.target.value = '';
+              }}
+            />
+
+            <button
+              type="button"
+              disabled={uploadingAvatar || savingAvatar}
+              onClick={() => fileRef.current?.click()}
+              className="w-full py-2.5 mb-3 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {uploadingAvatar ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-[#e91e8c]/30 border-t-[#e91e8c] rounded-full animate-spin" />
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Upload from device
+                </>
+              )}
+            </button>
+
+            <label className="text-xs text-gray-500 dark:text-gray-400">Or paste image URL</label>
             <input
               type="url"
               value={avatarUrl}
@@ -255,9 +315,9 @@ export default function ProfilePage() {
               placeholder="https://..."
               className="input-field mt-1 mb-3"
             />
-            {avatarError && (
-              <p className="text-sm text-red-500 mb-3">{avatarError}</p>
-            )}
+
+            {avatarError && <p className="text-sm text-red-500 mb-3">{avatarError}</p>}
+
             <div className="flex gap-3">
               <button
                 type="button"
@@ -269,18 +329,18 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={saveAvatar}
-                disabled={savingAvatar}
+                disabled={savingAvatar || uploadingAvatar}
                 className="flex-1 btn-primary py-2.5 rounded-xl text-sm disabled:opacity-50"
               >
-                {savingAvatar ? 'Saving…' : 'Save'}
+                {savingAvatar ? 'Saving…' : 'Save URL'}
               </button>
             </div>
             <p className="text-[11px] text-gray-400 mt-3 text-center">
-              Device upload coming next. For now paste a public image link.
+              PNG, JPG, GIF or WebP · max 2MB
             </p>
           </div>
         </div>
       )}
     </div>
   );
-     }
+}
