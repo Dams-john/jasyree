@@ -10,6 +10,63 @@ import { ApiError } from '../lib/api';
 
 type ReaderTheme = 'dark' | 'light' | 'sepia';
 
+/** Render chapter body with clear paragraph gaps. */
+function ChapterBody({
+  text,
+  fontSize,
+  lineSpacing,
+  textColor,
+}: {
+  text: string;
+  fontSize: number;
+  lineSpacing: number;
+  textColor: string;
+}) {
+  const normalized = (text || '').replace(/\r\n/g, '\n').trim();
+
+  // Prefer blank-line paragraphs; else split on single newlines
+  let blocks = normalized
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  if (blocks.length <= 1) {
+    blocks = normalized
+      .split('\n')
+      .map(p => p.trim())
+      .filter(Boolean);
+  }
+
+  if (blocks.length === 0) {
+    return (
+      <p
+        className="select-text"
+        style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing, color: textColor, fontFamily: "'Georgia', serif" }}
+      >
+        No content.
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className="select-text"
+      style={{
+        fontSize: `${fontSize}px`,
+        lineHeight: lineSpacing,
+        color: textColor,
+        fontFamily: "'Georgia', serif",
+      }}
+    >
+      {blocks.map((para, i) => (
+        <p key={i} className="mb-4 last:mb-0 whitespace-pre-line">
+          {para}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export default function ReadingPage() {
   const { novelId, chapterNum } = useParams<{ novelId: string; chapterNum: string }>();
   const navigate = useNavigate();
@@ -76,10 +133,6 @@ export default function ReadingPage() {
           setLocked(true);
           const errs = err.errors as { coinCost?: number } | null;
           const fromErr = errs?.coinCost;
-          const list = chapters.length
-            ? chapters
-            : [];
-          // Prefer cost from error body; fall back after chapters state may lag — use list from this request
           const targetCost =
             fromErr ??
             (await novelApi.chapters(novelId!).catch(() => [] as Chapter[])).find(
@@ -303,17 +356,12 @@ export default function ReadingPage() {
             </p>
           </div>
 
-          <div
-            className="whitespace-pre-line leading-relaxed select-text"
-            style={{
-              fontSize: `${fontSize}px`,
-              lineHeight: lineSpacing,
-              color: textColor,
-              fontFamily: "'Georgia', serif",
-            }}
-          >
-            {content}
-          </div>
+          <ChapterBody
+            text={content || ''}
+            fontSize={fontSize}
+            lineSpacing={lineSpacing}
+            textColor={textColor}
+          />
 
           <div className="mt-12 pt-6 border-t opacity-20" style={{ borderColor: textColor }}>
             <p className="text-center text-sm" style={{ color: textColor }}>
@@ -335,7 +383,7 @@ export default function ReadingPage() {
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <button
-            onClick={() => chN > 1 && navigate(`/read/${novelId}/${chN - 1}`)}
+            onClick={() => chN > 1 && navigate(`/read/\( {novelId}/ \){chN - 1}`)}
             disabled={chN <= 1}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
             style={{
@@ -380,7 +428,7 @@ export default function ReadingPage() {
             onClick={() => {
               const nextNum = chN + 1;
               if (nextNum > maxChapterNum) return;
-              navigate(`/read/${novelId}/${nextNum}`);
+              navigate(`/read/\( {novelId}/ \){nextNum}`);
             }}
             disabled={chN >= maxChapterNum}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-[#e91e8c] text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-[#c41578]"
@@ -496,4 +544,4 @@ export default function ReadingPage() {
       )}
     </div>
   );
-     }
+}
