@@ -80,6 +80,16 @@ export const novelApi = {
 export const userApi = {
   updateProfile: (fields: { name?: string; avatar?: string }) =>
     apiFetch<User>('/user/profile', { method: 'PATCH', body: JSON.stringify(fields) }),
+
+  uploadAvatar: (file: File) => {
+    const form = new FormData();
+    form.append('avatar', file);
+    return apiFetch<{ url: string }>('/user/avatar', {
+      method: 'POST',
+      body: form,
+    });
+  },
+
   readingHistory: (page = 1, perPage = 20) =>
     apiFetchPaginated<{
       novelId: number; novelTitle: string; novelSlug: string; cover: string; language: string;
@@ -103,7 +113,6 @@ export const userApi = {
   markAllNotificationsRead: () =>
     apiFetch<null>('/user/notifications/read-all', { method: 'PATCH' }),
 };
-
 export interface Tag {
   id: number;
   name: string;
