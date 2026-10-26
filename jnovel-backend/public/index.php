@@ -182,6 +182,8 @@ $routes = [
 
     // User account
     ['PATCH', '/api/user/profile', [UserController::class, 'updateProfile']],
+    ['PATCH', '/api/user/profile', [UserController::class, 'updateProfile']],
+    ['POST',  '/api/user/avatar',  [UserController::class, 'uploadAvatar']],
     ['GET', '/api/user/reading-history', [UserController::class, 'readingHistory']],
     ['POST', '/api/user/reading-progress', [UserController::class, 'recordProgress']],
     ['GET', '/api/user/favorites', [UserController::class, 'favorites']],
