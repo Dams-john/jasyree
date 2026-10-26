@@ -5,6 +5,24 @@ import { adminApi, AdminNovelListItem, PenName, Tag, genreApi } from '../../lib/
 import { ApiError } from '../../lib/api';
 import { Genre } from '../../data/genres';
 
+/** Only genres Miss J wants assignable in admin (matches public list). */
+const ALLOWED_GENRE_SLUGS = new Set([
+  'werewolf',
+  'billionaire',
+  'romance',
+  'erotica',
+  'chicklit',
+  'adult',
+  'ya-teen',
+  'paranormal',
+  'fantasy',
+  'young-adult',
+  'western',
+  'short-stories',
+  'mystery',
+  'game',
+]);
+
 export default function AdminNovels() {
   const [query, setQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -59,7 +77,9 @@ export default function AdminNovels() {
         setNovels(n);
         setPenNames(p);
         setAvailableTags(t);
-        setAvailableGenres(g);
+        setAvailableGenres(
+          g.filter(genre => ALLOWED_GENRE_SLUGS.has((genre.slug || '').toLowerCase().trim()))
+        );
       })
       .finally(() => setLoading(false));
   };
