@@ -32,6 +32,58 @@ class UserController
         Response::success(User::toApiShape($user), 'Profile updated.');
     }
 
+    /** POST /api/user/avatar — multipart field name: avatar */
+public function uploadAvatar(): void
+{
+    $userId = AuthMiddleware::requireUserId();
+
+    if (empty($_FILES['avatar']) || !is_uploaded_file($_FILES['avatar']['tmp_name'])) {
+        Response::error('No avatar file uploaded.', 422);
+    }
+
+    $file = $_FILES['avatar'];
+
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        Response::error('Upload failed.', 422);
+    }
+
+    if (($file['size'] ?? 0) > 2 * 1024 * 1024) {
+        Response::error('Avatar must be smaller than 2MB.', 422);
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($file['tmp_name']) ?: '';
+    $allowed = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+        'image/webp' => 'webp',
+    ];
+    if (!isset($allowed[$mime])) {
+        Response::error('Avatar must be PNG, JPG, GIF, or WebP.', 422);
+    }
+
+    $ext = $allowed[$mime];
+    $dir = dirname(__DIR__, 2) . '/public/uploads/avatars';
+    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+        Response::error('Could not create upload directory.', 500);
+    }
+
+    $name = 'u' . $userId . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+    $dest = $dir . '/' . $name;
+
+    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+        Response::error('Failed to save avatar.', 500);
+    }
+
+    // Public URL — same style as cover uploads (/api/uploads/... is rewritten in index.php)
+    $url = '/api/uploads/avatars/' . $name;
+
+    User::updateProfile($userId, ['avatar' => $url]);
+
+    Response::success(['url' => $url], 'Avatar uploaded.');
+}
+
     /** GET /api/user/reading-history?page=1&per_page=20 */
     public function readingHistory(): void
     {
