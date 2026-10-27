@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { X, Home, BookOpen, Coins, Gift, Users, User, Settings, Bell, Search, Tag, BarChart2, BookMarked, MoreHorizontal } from 'lucide-react';
+import { X, Home, BookOpen, Coins, User, Settings, Bell, Search, Tag, BarChart2, BookMarked, MoreHorizontal } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAvatarUrl } from '../../lib/avatar';
@@ -20,7 +20,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { icon: BookOpen, label: t.library, to: '/library' },
     { icon: Tag, label: t.genres, to: '/genres' },
     { icon: Coins, label: t.coins, to: '/wallet' },
-    { icon: Gift, label: t.rewards, to: '/rewards' },
     { icon: Bell, label: t.notifications, to: '/notifications' },
     { icon: Users, label: t.community, to: '/comments' },
     { icon: User, label: t.profile, to: '/profile' },
