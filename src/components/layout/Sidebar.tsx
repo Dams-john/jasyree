@@ -21,7 +21,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { icon: Tag, label: t.genres, to: '/genres' },
     { icon: Coins, label: t.coins, to: '/wallet' },
     { icon: Bell, label: t.notifications, to: '/notifications' },
-    { icon: Users, label: t.community, to: '/comments' },
     { icon: User, label: t.profile, to: '/profile' },
     { icon: BookMarked, label: 'Subscription', to: '/subscription' },
     { icon: Settings, label: t.settings, to: '/settings' },
