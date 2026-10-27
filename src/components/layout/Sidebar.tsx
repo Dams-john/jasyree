@@ -1,5 +1,18 @@
 import { Link, useLocation } from 'react-router-dom';
-import { X, Home, BookOpen, Coins, User, Settings, Bell, Search, Tag, BarChart2, BookMarked, MoreHorizontal } from 'lucide-react';
+import {
+  X,
+  Home,
+  BookOpen,
+  Coins,
+  User,
+  Settings,
+  Bell,
+  Search,
+  Tag,
+  BarChart2,
+  BookMarked,
+  MoreHorizontal,
+} from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAvatarUrl } from '../../lib/avatar';
