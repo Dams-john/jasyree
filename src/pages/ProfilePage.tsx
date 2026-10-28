@@ -182,24 +182,6 @@ export default function ProfilePage() {
       </div>
 
       <div className="px-4 pt-5 space-y-5">
-        <div className="card p-4">
-          <h2 className="font-bold text-gray-900 dark:text-white mb-3">Reading Activity</h2>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Hours Read', value: `${Math.round(user.totalReadTime / 60)}h` },
-              { label: 'Words Read', value: '—' },
-              { label: 'Streak', value: '—' },
-            ].map(stat => (
-              <div
-                key={stat.label}
-                className="text-center bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3"
-              >
-                <p className="text-lg font-black text-[#e91e8c]">{stat.value}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {recentlyRead.length > 0 && (
           <div>
