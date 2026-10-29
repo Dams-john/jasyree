@@ -110,9 +110,10 @@ public function uploadCover(): void
     }
 
     $ext = $allowed[$mime];
-    $dir = __DIR__ . '/../../public/uploads/covers';
-    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-        Response::error('Could not create upload directory.', 500);
+    $relative = 'covers/' . bin2hex(random_bytes(16)) . '.' . $ext;
+    $url = BunnyStorage::upload($relative, $file['tmp_name'], $mime);
+
+    Response::success(['url' => $url], 'Cover uploaded.', 201);
     }
 
     $name = bin2hex(random_bytes(16)) . '.' . $ext;
