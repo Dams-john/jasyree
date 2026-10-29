@@ -358,8 +358,7 @@ public function uploadCover(): void
             ];
         }, $stmt->fetchAll()));
     }
-
-    /** POST multipart: file (.docx|.txt), optional publishStatus, isPremium, coinCost, startNumber */
+    
     public function importManuscript(string $translationId): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -372,7 +371,7 @@ public function uploadCover(): void
         $name = strtolower($_FILES['file']['name'] ?? '');
         $tmp = $_FILES['file']['tmp_name'];
         $publishStatus = $_POST['publishStatus'] ?? 'draft';
-        $isPremium = !empty($_POST['isPremium']);
+        $lockFrom = max(0, (int) ($_POST['lockFromChapter'] ?? 0));
         $coinCost = (int) ($_POST['coinCost'] ?? 0);
         $startNumber = max(1, (int) ($_POST['startNumber'] ?? 1));
 
@@ -424,14 +423,19 @@ public function uploadCover(): void
                     $title = mb_substr($title, 0, 197) . '...';
                 }
                 $wordCount = str_word_count(strip_tags($content));
+
+                // Lock from chapter N onward
+                $chPremium = ($lockFrom > 0 && $number >= $lockFrom) ? 1 : 0;
+                $chCost = $chPremium ? $coinCost : 0;
+
                 $ins->execute([
                     $translation['id'],
                     $number,
                     $title,
                     $content,
                     $wordCount,
-                    $isPremium ? 1 : 0,
-                    $coinCost,
+                    $chPremium,
+                    $chCost,
                     $publishStatus,
                     $publishedAt,
                 ]);
@@ -439,6 +443,8 @@ public function uploadCover(): void
                     'chapterId' => (int) $pdo->lastInsertId(),
                     'number' => $number,
                     'title' => $title,
+                    'isPremium' => (bool) $chPremium,
+                    'coinCost' => $chCost,
                 ];
                 $number++;
             }
@@ -454,8 +460,9 @@ public function uploadCover(): void
             'createdCount' => count($created),
             'chapters' => $created,
         ], count($created) . ' chapters imported.', 201);
-    }
+}
 
+    
     private function extractTextFromDocx(string $path): string
     {
         if (!class_exists('ZipArchive')) {
