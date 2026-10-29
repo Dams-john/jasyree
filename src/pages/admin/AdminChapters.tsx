@@ -21,6 +21,10 @@ export default function AdminChapters() {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
 
+  // Manuscript lock options
+  const [lockFromChapter, setLockFromChapter] = useState('');
+  const [lockCoinCost, setLockCoinCost] = useState('10');
+
   // Edit modal
   const [editing, setEditing] = useState<AdminChapterListItem | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -160,15 +164,21 @@ export default function AdminChapters() {
     setError('');
     setUploadMsg('');
     try {
+      const lockFrom = Number(lockFromChapter) || 0;
       const res = await adminApi.importManuscript(translationId, file, {
         publishStatus: 'draft',
+        lockFromChapter: lockFrom > 0 ? lockFrom : undefined,
+        coinCost: lockFrom > 0 ? Number(lockCoinCost) || 0 : undefined,
       });
       setUploadMsg(
         'Imported ' +
           String(res.createdCount) +
           ' chapter' +
           (res.createdCount === 1 ? '' : 's') +
-          ' as draft.'
+          ' as draft.' +
+          (lockFrom > 0
+            ? ` Chapters from #\( {lockFrom} set Premium ( \){Number(lockCoinCost) || 0} coins).`
+            : '')
       );
       loadChapters();
     } catch (err) {
@@ -215,11 +225,42 @@ export default function AdminChapters() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 dark:text-gray-400">
-        Manuscript: DOCX or TXT. Put each chapter on its own line as{' '}
-        <span className="font-mono">Chapter 1</span>, <span className="font-mono">Chapter 2: Title</span>, etc.
-        Imports as <strong>draft</strong>. Edit a row to publish, set premium, or change coin cost.
-      </p>
+      <div className="card p-4 space-y-3">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Manuscript: DOCX or TXT. Headings like <span className="font-mono">Chapter 1</span>,{' '}
+          <span className="font-mono">Chapter 2: Title</span>. Imports as <strong>draft</strong>.
+        </p>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block mb-1">
+              Lock from chapter # (optional)
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={lockFromChapter}
+              onChange={e => setLockFromChapter(e.target.value)}
+              placeholder="e.g. 6"
+              className="input-field w-28"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block mb-1">
+              Coin cost for locked chapters
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={lockCoinCost}
+              onChange={e => setLockCoinCost(e.target.value)}
+              className="input-field w-28"
+            />
+          </div>
+          <p className="text-xs text-gray-400 pb-2">
+            Leave “Lock from” empty = all free. Example: 6 + 10 coins → ch 1–5 free, 6+ premium.
+          </p>
+        </div>
+      </div>
 
       {error && (
         <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
@@ -316,7 +357,7 @@ export default function AdminChapters() {
                             }`}
                           >
                             {ch.isPremium ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                            {ch.isPremium ? 'Premium' : 'Free'}
+                            {ch.isPremium ? `Premium${ch.coinCost ? ` · ${ch.coinCost}` : ''}` : 'Free'}
                           </span>
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell text-sm text-gray-500 dark:text-gray-400 capitalize">
@@ -496,4 +537,4 @@ export default function AdminChapters() {
       )}
     </div>
   );
-                                  }
+}
