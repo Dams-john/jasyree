@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../Models/Notification.php';
+require_once __DIR__ . '/../Utils/BunnyStorage.php';
 require_once __DIR__ . '/../Utils/Response.php';
 require_once __DIR__ . '/../Utils/Validator.php';
 require_once __DIR__ . '/../../config/database.php';
