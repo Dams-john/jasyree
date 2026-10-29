@@ -352,26 +352,19 @@ export const adminApi = {
   importManuscript: (
     translationId: number,
     file: File,
-    options?: {
-      publishStatus?: string;
-      isPremium?: boolean;
-      coinCost?: number;
-      startNumber?: number;
-    }
+    opts?: { publishStatus?: string; lockFromChapter?: number; coinCost?: number }
   ) => {
-    const form = new FormData();
-    form.append('file', file);
-    if (options?.publishStatus) form.append('publishStatus', options.publishStatus);
-    if (options?.isPremium) form.append('isPremium', '1');
-    if (options?.coinCost != null) form.append('coinCost', String(options.coinCost));
-    if (options?.startNumber != null) form.append('startNumber', String(options.startNumber));
-    return apiFetch<{
-      createdCount: number;
-      chapters: { chapterId: number; number: number; title: string }[];
-    }>(`/admin/translations/${translationId}/chapters/manuscript`, {
-      method: 'POST',
-      body: form,
-    });
+    const fd = new FormData();
+    fd.append('file', file);
+    if (opts?.publishStatus) fd.append('publishStatus', opts.publishStatus);
+    if (opts?.lockFromChapter != null && opts.lockFromChapter > 0) {
+      fd.append('lockFromChapter', String(opts.lockFromChapter));
+    }
+    if (opts?.coinCost != null) fd.append('coinCost', String(opts.coinCost));
+    return apiFetch<{ createdCount: number; chapters: { chapterId: number; number: number; title: string }[] }>(
+      `/admin/translations/${translationId}/chapters/manuscript`,
+      { method: 'POST', body: fd }
+    );
   },
 
   listPenNames: () => apiFetch<PenName[]>('/admin/pen-names'),
