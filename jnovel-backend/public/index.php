@@ -227,6 +227,7 @@ $routes = [
 
     // Admin dashboard — novels & multi-language editions
     ['GET', '/api/admin/novels', [AdminController::class, 'listNovels']],
+    ['POST', '/api/admin/novels/cover', [AdminController::class, 'uploadCover']],
     ['POST', '/api/admin/novels', [AdminController::class, 'createNovel']],
     ['GET', '/api/admin/novels/{id}', [AdminController::class, 'showNovel']],
     ['DELETE', '/api/admin/novels/{id}', [AdminController::class, 'deleteNovel']],
