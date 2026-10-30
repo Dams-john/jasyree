@@ -116,19 +116,6 @@ public function uploadCover(): void
     Response::success(['url' => $url], 'Cover uploaded.', 201);
     }
 
-    $name = bin2hex(random_bytes(16)) . '.' . $ext;
-    $dest = $dir . '/' . $name;
-    if (!move_uploaded_file($file['tmp_name'], $dest)) {
-        Response::error('Failed to save cover.', 500);
-    }
-
-    // Public URL — adjust if your API serves static files differently
-    $base = rtrim((string) (getenv('APP_URL') ?: 'https://api.jasyre.com'), '/');
-    $url = $base . '/uploads/covers/' . $name;
-
-    Response::success(['url' => $url], 'Cover uploaded.', 201);
-}
-
     public function showNovel(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
