@@ -27,7 +27,7 @@ export default function SignUpPage() {
     setError('');
     const result = await signup(name, email, password);
     setLoading(false);
-    if (result.ok) navigate('/email-verification', { state: { email } });
+    if (result.ok) navigate('/');
     else setError(result.error || 'Something went wrong. Please try again.');
   };
 
