@@ -685,9 +685,7 @@ public function uploadCover(): void
         Response::success(null, 'Chapter deleted.');
     }
 
-    // ============================================================
     // GENRES / TAGS
-    // ============================================================
 
     public function createGenre(): void
     {
@@ -721,6 +719,86 @@ public function uploadCover(): void
             'name' => trim($data['name']),
             'slug' => $slug,
         ], 'Genre created.', 201);
+    }
+
+    public function updateGenre(string $id): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+        $pdo = Database::connection();
+        $genreId = (int) $id;
+
+        $stmt = $pdo->prepare("SELECT id, name FROM genres WHERE id = ?");
+        $stmt->execute([$genreId]);
+        $genre = $stmt->fetch();
+        if (!$genre) {
+            Response::error('Genre not found.', 404);
+        }
+
+        $fields = [];
+        $params = [];
+
+        if (isset($data['name'])) {
+            $name = trim((string) $data['name']);
+            if ($name === '') {
+                Response::error('Genre name cannot be empty.', 422);
+            }
+            if (mb_strlen($name) > 60) {
+                Response::error('Genre name is too long.', 422);
+            }
+            $dup = $pdo->prepare("SELECT id FROM genres WHERE name = ? AND id != ?");
+            $dup->execute([$name, $genreId]);
+            if ($dup->fetch()) {
+                Response::error('A genre with this name already exists.', 409);
+            }
+            $fields[] = 'name = ?';
+            $params[] = $name;
+            $fields[] = 'slug = ?';
+            $params[] = $this->uniqueSlug('genres', $this->slugify($name));
+        }
+        if (array_key_exists('icon', $data)) {
+            $fields[] = 'icon = ?';
+            $params[] = $data['icon'] !== null && $data['icon'] !== '' ? (string) $data['icon'] : null;
+        }
+        if (array_key_exists('color', $data)) {
+            $fields[] = 'color = ?';
+            $params[] = $data['color'] !== null && $data['color'] !== '' ? (string) $data['color'] : null;
+        }
+        if (array_key_exists('cover', $data)) {
+            $fields[] = 'cover = ?';
+            $params[] = $data['cover'] !== null && $data['cover'] !== '' ? (string) $data['cover'] : null;
+        }
+
+        if (empty($fields)) {
+            Response::error('No valid fields to update.', 422);
+        }
+
+        $params[] = $genreId;
+        $pdo->prepare('UPDATE genres SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        Response::success(null, 'Genre updated.');
+    }
+
+    public function deleteGenre(string $id): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $pdo = Database::connection();
+        $genreId = (int) $id;
+
+        $stmt = $pdo->prepare("SELECT id FROM genres WHERE id = ?");
+        $stmt->execute([$genreId]);
+        if (!$stmt->fetch()) {
+            Response::error('Genre not found.', 404);
+        }
+
+        $countStmt = $pdo->prepare("SELECT COUNT(*) AS c FROM novel_genres WHERE genre_id = ?");
+        $countStmt->execute([$genreId]);
+        $linked = (int) $countStmt->fetch()['c'];
+        if ($linked > 0) {
+            Response::error("Cannot delete: {$linked} novel(s) still use this genre. Remove it from those novels first.", 409);
+        }
+
+        $pdo->prepare("DELETE FROM genres WHERE id = ?")->execute([$genreId]);
+        Response::success(null, 'Genre deleted.');
     }
 
     public function listTags(): void
