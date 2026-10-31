@@ -255,16 +255,10 @@ public function uploadCover(): void
             throw $e;
         }
 
-        $pdo->commit();
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            throw $e;
-        }
-
         $this->clearHomeCache();
         Response::success(null, 'Novel deleted.');
     }
-
+    
     public function addTranslation(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
