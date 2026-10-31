@@ -217,6 +217,9 @@ $routes = [
 
     // NEW: admin dashboard — genres, stats, notifications
     ['POST', '/api/admin/genres', [AdminController::class, 'createGenre']],
+    ['POST',   '/api/admin/genres',      [AdminController::class, 'createGenre']],
+    ['PUT',    '/api/admin/genres/{id}', [AdminController::class, 'updateGenre']],
+    ['DELETE', '/api/admin/genres/{id}', [AdminController::class, 'deleteGenre']],
     ['PUT', '/api/admin/novels/{id}/tags', [AdminController::class, 'updateNovelTags']],
     ['GET', '/api/admin/stats', [AdminController::class, 'stats']],
     ['GET',  '/api/admin/tags', [AdminController::class, 'listTags']],
