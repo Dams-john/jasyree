@@ -194,6 +194,7 @@ public function uploadCover(): void
             throw $e;
         }
 
+        $this->clearHomeCache();
         Response::success(['novelId' => $novelId, 'translationId' => $translationId, 'slug' => $slug], 'Novel created.', 201);
     }
 
@@ -254,6 +255,13 @@ public function uploadCover(): void
             throw $e;
         }
 
+        $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        $this->clearHomeCache();
         Response::success(null, 'Novel deleted.');
     }
 
@@ -314,6 +322,7 @@ public function uploadCover(): void
         $pdo = Database::connection();
         $stmt = $pdo->prepare("UPDATE novel_translations SET " . implode(', ', $fields) . " WHERE id = ?");
         $stmt->execute($params);
+        $this->clearHomeCache();
         Response::success(null, 'Translation updated.');
     }
 
