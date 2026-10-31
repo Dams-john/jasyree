@@ -374,6 +374,21 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
 
+  createGenre: (data: { name: string; icon?: string; color?: string; cover?: string }) =>
+    apiFetch<{ id: number; name: string; slug: string }>('/admin/genres', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateGenre: (id: number, data: { name?: string; icon?: string; color?: string; cover?: string }) =>
+    apiFetch<null>(`/admin/genres/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteGenre: (id: number) =>
+    apiFetch<null>(`/admin/genres/${id}`, { method: 'DELETE' }),
+
   listAdminCoinPackages: () =>
     apiFetch<
       {
