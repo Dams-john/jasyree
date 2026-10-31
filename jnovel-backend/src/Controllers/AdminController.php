@@ -1262,6 +1262,13 @@ public function uploadCover(): void
         }
     }
 
+    private function clearHomeCache(): void
+{
+    foreach (glob(sys_get_temp_dir() . '/jasyre_home_*.json') ?: [] as $file) {
+        @unlink($file);
+    }
+}
+
     private function verifyPenNameOwnership(int $penNameId, array $payload): void
     {
         if ($payload['role'] === 'admin') {
