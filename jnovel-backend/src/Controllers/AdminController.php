@@ -897,28 +897,60 @@ public function uploadCover(): void
             'advertisementRevenue' => null,
         ]);
     }
-
+    
     public function broadcastNotification(): void
     {
         AuthMiddleware::requireRole(['admin']);
         $data = $this->body();
 
-        (new Validator($data))
-            ->required('title', 'Title')
-            ->required('message', 'Message')
-            ->validate();
+        $title = trim((string) ($data['title'] ?? ''));
+        $message = trim((string) ($data['message'] ?? ''));
+        $audience = ($data['audience'] ?? 'all') === 'subscribers' ? 'subscribers' : 'all';
 
-        $audience = $data['audience'] ?? 'all';
-        $userIds = match ($audience) {
-            'subscribers' => Notification::getActiveSubscriberIds(),
-            'all' => Notification::getAllUserIds(),
-            default => Response::error('audience must be "all" or "subscribers".', 422),
-        };
+        if ($title === '' || $message === '') {
+            Response::error('Title and message are required.', 422);
+        }
+        if (mb_strlen($title) > 120) {
+            Response::error('Title is too long.', 422);
+        }
+        if (mb_strlen($message) > 2000) {
+            Response::error('Message is too long.', 422);
+        }
 
-        Notification::createBulk($userIds, 'promo', $data['title'], $data['message']);
-        Response::success(['recipientCount' => count($userIds)], 'Promotion sent.', 201);
+        $pdo = Database::connection();
+
+        if ($audience === 'subscribers') {
+            $stmt = $pdo->query("
+                SELECT DISTINCT u.id
+                FROM users u
+                INNER JOIN user_subscriptions us ON us.user_id = u.id
+                WHERE us.status = 'active'
+                  AND (us.ends_at IS NULL OR us.ends_at > NOW())
+            ");
+        } else {
+            $stmt = $pdo->query("SELECT id FROM users");
+        }
+
+        $userIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        if (empty($userIds)) {
+            Response::success(['recipientCount' => 0], 'No matching users.');
+            return;
+        }
+
+        $insert = $pdo->prepare("
+            INSERT INTO notifications (user_id, title, body, type, is_read, created_at)
+            VALUES (?, ?, ?, 'broadcast', 0, NOW())
+        ");
+
+        $count = 0;
+        foreach ($userIds as $uid) {
+            $insert->execute([(int) $uid, $title, $message]);
+            $count++;
+        }
+
+        Response::success(['recipientCount' => $count], 'Broadcast sent.');
     }
-
+    
     public function rewardCoins(string $userId): void
     {
         AuthMiddleware::requireRole(['admin']);
