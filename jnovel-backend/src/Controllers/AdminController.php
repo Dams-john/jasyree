@@ -28,7 +28,7 @@ class AdminController
         $isAdmin = $payload['role'] === 'admin';
         $sql = "
             SELECT n.id, n.slug, n.is_featured, n.rating_avg, n.rating_count, n.views_count,
-                   n.created_at, pn.name AS pen_name, pn.id AS pen_name_id
+                   n.display_views, n.created_at, pn.name AS pen_name, pn.id AS pen_name_id
             FROM novels n
             INNER JOIN pen_names pn ON pn.id = n.pen_name_id
         ";
@@ -74,6 +74,7 @@ class AdminController
             'isFeatured' => (bool) $n['is_featured'],
             'rating' => (float) $n['rating_avg'],
             'views' => (int) $n['views_count'],
+            'displayViews' => $n['display_views'] !== null ? (int) $n['display_views'] : null,
             'translations' => $translationsByNovel[$n['id']] ?? [],
         ], $novels));
     }
@@ -1412,7 +1413,6 @@ public function uploadCover(): void
         return $novel;
     }
 
-    /** PUT /api/admin/novels/{id}/tags */
     public function updateNovelTags(string $id): void
     {
         $payload = AuthMiddleware::requireRole(['author', 'admin']);
@@ -1439,7 +1439,29 @@ public function uploadCover(): void
         $this->syncTags($novelId, $tagIds);
         Response::success(null, 'Tags updated.');
     }
+    
+    public function updateDisplayViews(string $id): void
+    {
+        AuthMiddleware::requireRole(['admin']);
+        $data = $this->body();
+        $pdo = Database::connection();
+        $novelId = (int) $id;
 
+        $stmt = $pdo->prepare("SELECT id FROM novels WHERE id = ?");
+        $stmt->execute([$novelId]);
+        if (!$stmt->fetch()) {
+            Response::error('Novel not found.', 404);
+        }
+
+        if (!array_key_exists('displayViews', $data) || $data['displayViews'] === null || $data['displayViews'] === '') {
+            $pdo->prepare("UPDATE novels SET display_views = NULL WHERE id = ?")->execute([$novelId]);
+        } else {
+            $pdo->prepare("UPDATE novels SET display_views = ? WHERE id = ?")
+                ->execute([(int) $data['displayViews'], $novelId]);
+        }
+
+        Response::success(null, 'Display views updated.');
+    }
 
     private function getOwnedTranslationOr404(int $translationId, array $payload): array
     {
