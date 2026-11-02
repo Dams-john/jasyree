@@ -469,6 +469,12 @@ export const adminApi = {
       body: JSON.stringify({ tagIds }),
     }),
 
+  updateDisplayViews: (id: number, displayViews: number | null) =>
+  apiFetch<null>(`/admin/novels/${id}/display-views`, {
+    method: 'PUT',
+    body: JSON.stringify({ displayViews }),
+  }),
+
   listComments: (novelIdOrSlug: string | number, page = 1, perPage = 20) =>
     apiFetchPaginated<CommentItem>(`/novels/${novelIdOrSlug}/comments`, {
       params: { page, per_page: perPage },
