@@ -938,7 +938,7 @@ public function uploadCover(): void
         }
 
         $insert = $pdo->prepare("
-            INSERT INTO notifications (user_id, title, body, type, is_read, created_at)
+            INSERT INTO notifications (user_id, title, message, type, is_read, created_at)
             VALUES (?, ?, ?, 'broadcast', 0, NOW())
         ");
 
