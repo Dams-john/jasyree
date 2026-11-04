@@ -5,7 +5,6 @@ import { adminApi, AdminNovelListItem, PenName, Tag, genreApi } from '../../lib/
 import { ApiError } from '../../lib/api';
 import { Genre } from '../../data/genres';
 
-/** Only genres Miss J wants assignable in admin (matches public list). */
 const ALLOWED_GENRE_SLUGS = new Set([
   'werewolf',
   'billionaire',
@@ -202,11 +201,14 @@ export default function AdminNovels() {
       setEditSynopsis(t.synopsis || '');
       setEditCover(t.cover || '');
       setEditStatus(t.status || 'ongoing');
-      setEditGenreIds(
-        Array.isArray(detail.genres) ? detail.genres.map(g => g.id) : []
-      );
+      setEditGenreIds(Array.isArray(detail.genres) ? detail.genres.map(g => g.id) : []);
       const tags = (detail as { tags?: { id: number }[] }).tags;
       setEditTagIds(Array.isArray(tags) ? tags.map(x => x.id) : []);
+      const fromList = novels.find(n => n.id === novelId) as
+        | (AdminNovelListItem & { displayViews?: number | null })
+        | undefined;
+      const dv = fromList?.displayViews;
+      setEditDisplayViews(dv != null ? String(dv) : '');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load novel for edit.');
     }
@@ -226,8 +228,13 @@ export default function AdminNovels() {
       });
       await adminApi.updateNovelGenres(editingNovelId, editGenreIds);
       await adminApi.updateNovelTags(editingNovelId, editTagIds);
+      await adminApi.updateDisplayViews(
+        editingNovelId,
+        editDisplayViews.trim() === '' ? null : Number(editDisplayViews)
+      );
       setEditingNovelId(null);
       setEditTranslationId(null);
+      setEditDisplayViews('');
       load();
     } catch (err) {
       setEditError(err instanceof ApiError ? err.message : 'Failed to update novel.');
@@ -394,6 +401,8 @@ export default function AdminNovels() {
                   filtered.map((novel, i) => {
                     const primary = novel.translations[0];
                     const label = primary?.title || novel.slug;
+                    const displayViews = (novel as AdminNovelListItem & { displayViews?: number | null })
+                      .displayViews;
                     return (
                       <tr
                         key={novel.id}
@@ -426,6 +435,11 @@ export default function AdminNovels() {
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-700 dark:text-gray-300">
                           {novel.views.toLocaleString()}
+                          {displayViews != null && (
+                            <span className="block text-[10px] text-gray-400">
+                              public: {displayViews.toLocaleString()}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 justify-end">
@@ -653,6 +667,22 @@ export default function AdminNovels() {
                 <option value="completed">Completed</option>
                 <option value="hiatus">Hiatus</option>
               </select>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
+                  Public views (optional)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editDisplayViews}
+                  onChange={e => setEditDisplayViews(e.target.value)}
+                  placeholder="Leave empty to show real views"
+                  className="input-field"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Readers see this number if set. Admin table still shows real views.
+                </p>
+              </div>
               {availableGenres.length > 0 && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
@@ -718,6 +748,7 @@ export default function AdminNovels() {
                 onClick={() => {
                   setEditingNovelId(null);
                   setEditTranslationId(null);
+                  setEditDisplayViews('');
                 }}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
               >
