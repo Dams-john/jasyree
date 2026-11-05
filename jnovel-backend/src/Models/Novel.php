@@ -15,7 +15,7 @@ class Novel
         SELECT
             nt.id AS translation_id, n.id AS novel_id, nt.title, nt.slug, nt.cover, nt.synopsis,
             nt.status, nt.language, nt.chapters_count, nt.published_at, nt.updated_at,
-            n.is_featured, n.rating_avg, n.rating_count, n.views_count,
+            n.is_featured, n.rating_avg, n.rating_count, n.views_count, n.display_views,
             pn.name AS pen_name
         FROM novel_translations nt
         INNER JOIN novels n ON n.id = nt.novel_id
