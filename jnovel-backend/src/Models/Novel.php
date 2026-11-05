@@ -5,12 +5,7 @@ require_once __DIR__ . '/../../config/database.php';
 class Novel
 {
     public const DEFAULT_LANGUAGE = 'en';
-
-    /**
-     * Base SELECT: joins novels -> novel_translations (for a given language) -> pen_names.
-     * Only returns rows where that language edition is actually published.
-     * The `?` placeholder for language must be bound first by every caller.
-     */
+    
     private const BASE_SELECT = "
         SELECT
             nt.id AS translation_id, n.id AS novel_id, nt.title, nt.slug, nt.cover, nt.synopsis,
@@ -34,6 +29,18 @@ class Novel
         return (string) $n;
     }
 
+    /** Prefer admin display_views when set; otherwise real views_count. */
+    private static function publicViewsCount(array $row): int
+    {
+        if (array_key_exists('display_views', $row)
+            && $row['display_views'] !== null
+            && $row['display_views'] !== ''
+        ) {
+            return (int) $row['display_views'];
+        }
+        return (int) ($row['views_count'] ?? 0);
+    }
+
     /** Map a raw DB row (+ optional per-user fields) into the frontend Novel shape. */
     public static function toApiShape(array $row, ?array $userContext = null): array
     {
@@ -49,7 +56,7 @@ class Novel
             'status' => ucfirst($row['status']),
             'rating' => (float) $row['rating_avg'],
             'reviews' => (int) $row['rating_count'],
-            'views' => self::formatCount((int) $row['views_count']),
+            'views' => self::formatCount(self::publicViewsCount($row)),
             'likes' => (int) ($row['like_count'] ?? 0),
             'chapters' => (int) $row['chapters_count'],
             'language' => $row['language'],
@@ -279,7 +286,7 @@ class Novel
                 nt.id AS translation_id, n.id AS novel_id, nt.title, nt.slug, nt.cover,
                 '' AS synopsis,
                 nt.status, nt.language, nt.chapters_count, nt.published_at, nt.updated_at,
-                n.is_featured, n.rating_avg, n.rating_count, n.views_count,
+                n.is_featured, n.rating_avg, n.rating_count, n.views_count, n.display_views,
                 pn.name AS pen_name
             FROM novel_translations nt
             INNER JOIN novels n ON n.id = nt.novel_id
@@ -399,7 +406,7 @@ class Novel
             'completed' => $mapSection($completedRows),
             'continueReading' => $userId ? self::getContinueReading($userId) : [],
         ];
-}
+    }
 
     public static function getByGenre(string $genreSlug, string $lang, int $page = 1, int $perPage = 20, ?int $userId = null): array
     {
@@ -474,7 +481,7 @@ class Novel
             SELECT
                 nt.id AS translation_id, n.id AS novel_id, nt.title, nt.slug, nt.cover, nt.synopsis,
                 nt.status, nt.language, nt.chapters_count, nt.published_at, nt.updated_at,
-                n.is_featured, n.rating_avg, n.rating_count, n.views_count,
+                n.is_featured, n.rating_avg, n.rating_count, n.views_count, n.display_views,
                 pn.name AS pen_name,
                 rp.chapter_id AS current_chapter_id,
                 rp.updated_at AS progress_updated_at,
