@@ -1,12 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Star, BookOpen, BookmarkPlus, BookmarkCheck, Heart, Eye, Share2, Lock, Check } from 'lucide-react';
+import {
+  ArrowLeft,
+  Star,
+  BookOpen,
+  BookmarkPlus,
+  BookmarkCheck,
+  Heart,
+  Eye,
+  Share2,
+  Lock,
+  Check,
+} from 'lucide-react';
 import { Novel, Chapter } from '../data/novels';
 import { COMMENTS } from '../data/users';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { novelApi, userApi, commentApi, CommentItem } from '../lib/resources';
 import { ApiError } from '../lib/api';
+import { watchRewardedAd } from '../lib/applixir';
 
 type Tab = 'chapters' | 'about' | 'comments';
 
@@ -18,7 +30,6 @@ function SynopsisBlocks({ text, className = '' }: { text: string; className?: st
     .map(p => p.trim())
     .filter(Boolean);
 
-  // If author only used single Enter (no blank line), still split lines into blocks
   const blocks =
     parts.length > 1
       ? parts
@@ -54,6 +65,7 @@ export default function NovelDetailPage() {
   const [unlockChapterId, setUnlockChapterId] = useState<number | null>(null);
   const [unlockCoinCost, setUnlockCoinCost] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
+  const [adUnlocking, setAdUnlocking] = useState(false);
   const [unlockError, setUnlockError] = useState('');
 
   const [novel, setNovel] = useState<Novel | null>(null);
@@ -175,6 +187,36 @@ export default function NovelDetailPage() {
     navigate(readPath(chapterNum));
   };
 
+  const handleAdUnlock = async () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!unlockChapterId || unlockChapter == null) return;
+    setAdUnlocking(true);
+    setUnlockError('');
+    try {
+      await watchRewardedAd();
+      await novelApi.unlockChapterViaAd(unlockChapterId);
+      setShowUnlock(false);
+      if (id) {
+        const ch = await novelApi.chapters(id);
+        setChapters(ch);
+      }
+      navigate(readPath(unlockChapter));
+    } catch (err) {
+      setUnlockError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Ad unlock failed.'
+      );
+    } finally {
+      setAdUnlocking(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -256,7 +298,7 @@ export default function NovelDetailPage() {
               <span>{novel.views}</span>
             </div>
             <span
-              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              className={`text- px-2 py-0.5 rounded-full font-medium ${
                 novel.status === 'Completed'
                   ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
                   : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
@@ -542,16 +584,24 @@ export default function NovelDetailPage() {
               <div className="text-4xl mb-3">🔒</div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Premium Chapter</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Unlock Chapter {unlockChapter} to continue reading.
-                {unlockCoinCost > 0 ? ` Use ${unlockCoinCost} coins or subscribe.` : ''}
+                Unlock Chapter {unlockChapter} to continue reading. Watch a short ad, use coins, or
+                subscribe.
               </p>
             </div>
             <div className="space-y-3">
+              <button
+                type="button"
+                disabled={adUnlocking || unlocking || !unlockChapterId}
+                className="w-full py-3 rounded-xl bg-[#e91e8c] text-white text-sm font-semibold disabled:opacity-50"
+                onClick={handleAdUnlock}
+              >
+                {adUnlocking ? 'Loading ad…' : 'Watch ad to unlock chapter'}
+              </button>
               {unlockCoinCost > 0 && (
                 <button
                   type="button"
-                  disabled={unlocking || !unlockChapterId}
-                  className="w-full py-3 rounded-xl bg-[#e91e8c] text-white text-sm font-semibold disabled:opacity-50"
+                  disabled={unlocking || adUnlocking || !unlockChapterId}
+                  className="w-full py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 text-sm font-semibold disabled:opacity-50"
                   onClick={async () => {
                     if (!isAuthenticated) {
                       navigate('/login');
