@@ -1,12 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Bookmark, BookmarkCheck, Settings2, Sun, Moon, AlignJustify, ChevronLeft, ChevronRight, X, Type, Lock } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
+  Settings2,
+  Sun,
+  Moon,
+  AlignJustify,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Type,
+  Lock,
+} from 'lucide-react';
 import { Novel, Chapter } from '../data/novels';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { novelApi, userApi } from '../lib/resources';
 import { ApiError } from '../lib/api';
+import { watchRewardedAd } from '../lib/applixir';
 
 type ReaderTheme = 'dark' | 'light' | 'sepia';
 
@@ -24,7 +38,6 @@ function ChapterBody({
 }) {
   const normalized = (text || '').replace(/\r\n/g, '\n').trim();
 
-  // Prefer blank-line paragraphs; else split on single newlines
   let blocks = normalized
     .split(/\n\s*\n/)
     .map(p => p.trim())
@@ -41,7 +54,12 @@ function ChapterBody({
     return (
       <p
         className="select-text"
-        style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing, color: textColor, fontFamily: "'Georgia', serif" }}
+        style={{
+          fontSize: `${fontSize}px`,
+          lineHeight: lineSpacing,
+          color: textColor,
+          fontFamily: "'Georgia', serif",
+        }}
       >
         No content.
       </p>
@@ -91,13 +109,12 @@ export default function ReadingPage() {
   const [error, setError] = useState('');
   const [coinCost, setCoinCost] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
+  const [adUnlocking, setAdUnlocking] = useState(false);
 
   const chN = Number(chapterNum);
   const chapter = chapters.find(c => c.number === chN);
   const maxChapterNum =
-    chapters.length > 0
-      ? Math.max(...chapters.map(c => c.number))
-      : novel?.chapters || 1;
+    chapters.length > 0 ? Math.max(...chapters.map(c => c.number)) : novel?.chapters || 1;
   const progressReported = useRef(false);
 
   useEffect(() => {
@@ -177,6 +194,35 @@ export default function ReadingPage() {
     }
   };
 
+  const handleAdUnlock = async () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    const target = chapters.find(c => c.number === chN);
+    if (!target) return;
+    setAdUnlocking(true);
+    setError('');
+    try {
+      // Only continues after AppLixir status.type === 'complete'
+      await watchRewardedAd();
+      await novelApi.unlockChapterViaAd(target.id);
+      setLocked(false);
+      const full = await novelApi.chapterContent(target.id);
+      setContent(full.content);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Ad unlock failed.'
+      );
+    } finally {
+      setAdUnlocking(false);
+    }
+  };
+
   const reportProgress = useCallback(
     (pct: number) => {
       if (!isAuthenticated || !novel?.translationId || !chapter) return;
@@ -248,33 +294,46 @@ export default function ReadingPage() {
         <Lock className="w-10 h-10 text-amber-500" />
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Chapter {chN} is locked</h2>
         <p className="text-gray-500 dark:text-gray-400 max-w-sm">
-          Premium chapter.
-          {coinCost > 0
-            ? ` Unlock with ${coinCost} coins, or subscribe for full access.`
-            : ' Subscribe to unlock, or set a coin price in admin.'}
+          Premium chapter. Watch a short ad to unlock, use coins, or subscribe.
         </p>
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full max-w-md justify-center">
-          <Link to={`/novel/${novel.id}`} className="btn-outline px-6 py-2.5 rounded-xl text-center">
-            Back to Novel
-          </Link>
+        <div className="flex flex-col gap-3 w-full max-w-md">
+          <button
+            type="button"
+            disabled={adUnlocking || unlocking}
+            className="w-full py-3 rounded-xl bg-[#e91e8c] text-white text-sm font-semibold disabled:opacity-50"
+            onClick={handleAdUnlock}
+          >
+            {adUnlocking ? 'Loading ad…' : 'Watch ad to unlock chapter'}
+          </button>
           {coinCost > 0 && (
             <button
               type="button"
-              disabled={unlocking}
-              className="btn-primary px-6 py-2.5 rounded-xl disabled:opacity-50"
+              disabled={unlocking || adUnlocking}
+              className="w-full py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-800 dark:text-gray-200 disabled:opacity-50"
               onClick={handleUnlock}
             >
               {unlocking ? 'Unlocking…' : `Unlock · ${coinCost} coins`}
             </button>
           )}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              to="/buy-coins"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-amber-500/50 text-amber-600 dark:text-amber-400 text-center text-sm font-medium"
+            >
+              Buy coins
+            </Link>
+            <Link
+              to="/subscription"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-center text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Subscribe
+            </Link>
+          </div>
           <Link
-            to="/buy-coins"
-            className="px-6 py-2.5 rounded-xl border border-amber-500/50 text-amber-600 dark:text-amber-400 text-center text-sm font-medium"
+            to={`/novel/${novel.id}`}
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-[#e91e8c]"
           >
-            Buy coins
-          </Link>
-          <Link to="/subscription" className="btn-primary px-6 py-2.5 rounded-xl text-center">
-            Subscribe
+            Back to novel
           </Link>
         </div>
         {error && <p className="text-sm text-red-500 max-w-sm">{error}</p>}
@@ -284,12 +343,10 @@ export default function ReadingPage() {
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ background: bgColor }}>
-      {/* Reading Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-0.5 bg-gray-200/20 z-50">
         <div className="h-full bg-[#e91e8c] transition-all duration-200" style={{ width: `${progress}%` }} />
       </div>
 
-      {/* Top Bar */}
       <div
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
           showUI ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
@@ -330,7 +387,10 @@ export default function ReadingPage() {
         </div>
         <div className="max-w-2xl mx-auto px-4 pb-2 flex items-center gap-2">
           <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-[#e91e8c] rounded-full transition-all duration-200" style={{ width: `${progress}%` }} />
+            <div
+              className="h-full bg-[#e91e8c] rounded-full transition-all duration-200"
+              style={{ width: `${progress}%` }}
+            />
           </div>
           <span className="text-xs opacity-50 shrink-0" style={{ color: textColor }}>
             {progress}%
@@ -338,7 +398,6 @@ export default function ReadingPage() {
         </div>
       </div>
 
-      {/* Reading Content */}
       <div
         ref={contentRef}
         className="flex-1 overflow-y-auto px-4 sm:px-8"
@@ -371,7 +430,6 @@ export default function ReadingPage() {
         </div>
       </div>
 
-      {/* Bottom Bar */}
       <div
         className={`fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ${
           showUI ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
@@ -439,7 +497,6 @@ export default function ReadingPage() {
         </div>
       </div>
 
-      {/* Settings Panel */}
       {showSettings && (
         <div className="fixed inset-0 z-50" onClick={() => setShowSettings(false)}>
           <div
@@ -527,7 +584,9 @@ export default function ReadingPage() {
                     key={th}
                     onClick={() => setReaderTheme(th)}
                     className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all capitalize ${
-                      readerTheme === th ? 'border-[#e91e8c] text-[#e91e8c]' : 'border-gray-200 dark:border-gray-700'
+                      readerTheme === th
+                        ? 'border-[#e91e8c] text-[#e91e8c]'
+                        : 'border-gray-200 dark:border-gray-700'
                     }`}
                     style={{
                       background: th === 'dark' ? '#0f0f1a' : th === 'sepia' ? '#f7f0e6' : '#ffffff',
