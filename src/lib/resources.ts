@@ -75,6 +75,15 @@ export const novelApi = {
       method: 'POST',
       body: JSON.stringify({}),
     }),
+  unlockChapter: (chapterId: number) =>
+    apiFetch<{ chapterId: number; coinsSpent: number; balance: number }>(`/chapters/${chapterId}/unlock`, {
+      method: 'POST',
+    }),
+
+  unlockChapterViaAd: (chapterId: number) =>
+    apiFetch<{ chapterId: number; method: string }>(`/chapters/${chapterId}/unlock-ad`, {
+      method: 'POST',
+    }),
 };
 
 export const userApi = {
