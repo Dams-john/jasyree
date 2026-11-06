@@ -7,7 +7,6 @@ require_once __DIR__ . '/../../config/database.php';
 
 class NovelController
 {
-    /** GET /api/search?q=alpha&page=1&per_page=20&lang=en */
     public function search(): void
     {
         $query = trim($_GET['q'] ?? '');
@@ -24,7 +23,6 @@ class NovelController
         Response::paginated($result['items'], $result['total'], $page, $perPage);
     }
 
-    /** GET /api/novels/{translationSlugOrId}?lang=en */
     public function show(string $idOrSlug): void
     {
         $userId = AuthMiddleware::optionalUserId();
@@ -45,7 +43,6 @@ class NovelController
             }
         }
 
-        // null userId = public shape (no per-user flags slowing the heavy query)
         $novel = Novel::findBySlugOrId($idOrSlug, $lang, null);
         if (!$novel) {
             Response::error('Novel not found.', 404);
@@ -69,7 +66,6 @@ class NovelController
         Response::success($novel);
     }
 
-    /** GET /api/novels/{translationSlugOrId}/chapters?lang=en */
     public function chapters(string $idOrSlug): void
     {
         $userId = AuthMiddleware::optionalUserId();
@@ -200,7 +196,6 @@ class NovelController
         ]);
     }
 
-    /** POST /api/chapters/{id}/unlock — spend coins to unlock a premium chapter */
     public function unlockChapter(string $id): void
     {
         $userId = AuthMiddleware::requireUserId();
@@ -277,6 +272,44 @@ class NovelController
             'coinsSpent' => $cost,
             'balance' => $newBal,
         ], 'Chapter unlocked.');
+    }
+
+    public function unlockChapterViaAd(string $id): void
+    {
+        $userId = AuthMiddleware::requireUserId();
+        $pdo = Database::connection();
+
+        $stmt = $pdo->prepare("
+            SELECT id, title, is_premium, publish_status
+            FROM chapters WHERE id = ?
+        ");
+        $stmt->execute([(int) $id]);
+        $chapter = $stmt->fetch();
+        if (!$chapter) {
+            Response::error('Chapter not found.', 404);
+        }
+        if (!(bool) $chapter['is_premium']) {
+            Response::success(['alreadyFree' => true], 'Chapter is free.');
+        }
+
+        $check = $pdo->prepare(
+            "SELECT 1 FROM chapter_unlocks WHERE user_id = ? AND chapter_id = ?"
+        );
+        $check->execute([$userId, $chapter['id']]);
+        if ($check->fetch()) {
+            Response::success(['alreadyUnlocked' => true], 'Already unlocked.');
+        }
+
+        // coins_spent = 0 marks ad unlock (same table as coin unlocks)
+        $pdo->prepare("
+            INSERT INTO chapter_unlocks (user_id, chapter_id, coins_spent)
+            VALUES (?, ?, 0)
+        ")->execute([$userId, $chapter['id']]);
+
+        Response::success([
+            'chapterId' => (int) $chapter['id'],
+            'method' => 'ad',
+        ], 'Chapter unlocked via ad.');
     }
 
     private function resolveTranslationId(string $identifier, string $lang): ?int
