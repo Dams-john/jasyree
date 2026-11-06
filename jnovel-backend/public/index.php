@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-// ---- Built-in PHP CLI server router support ----
 if (php_sapi_name() === 'cli-server') {
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
     if ($path !== '/' && file_exists(__DIR__ . $path) && !is_dir(__DIR__ . $path)) {
@@ -13,7 +12,6 @@ if (php_sapi_name() === 'cli-server') {
 $uploadUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
 $uploadUri = '/' . ltrim($uploadUri, '/');
 
-// Strip script directory if API is not at domain root
 $scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
 if ($scriptDir !== '' && $scriptDir !== '/' && str_starts_with($uploadUri, $scriptDir)) {
     $uploadUri = substr($uploadUri, strlen($scriptDir)) ?: '/';
@@ -52,7 +50,6 @@ if (str_starts_with($uploadUri, '/uploads/')) {
     exit;
 }
 
-// ---- CORS ----
 require_once __DIR__ . '/../config/config.php';
 $config = appConfig();
 $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -79,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../src/Utils/Response.php';
 
-// ---- Error handling: always return JSON, never leak PHP errors/HTML ----
 set_exception_handler(function (Throwable $e) use ($config) {
     error_log($e->getMessage() . "\n" . $e->getTraceAsString());
     Response::error(
@@ -92,7 +88,6 @@ set_error_handler(function ($severity, $message, $file, $line) {
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
 
-// ---- Controllers ----
 require_once __DIR__ . '/../src/Controllers/HomeController.php';
 require_once __DIR__ . '/../src/Controllers/GenreController.php';
 require_once __DIR__ . '/../src/Controllers/NovelController.php';
@@ -104,11 +99,9 @@ require_once __DIR__ . '/../src/Controllers/CommentController.php';
 require_once __DIR__ . '/../src/Controllers/TagController.php';
 require_once __DIR__ . '/../src/Controllers/PaymentController.php';
 
-// ---- Routing ----
 $method = $_SERVER['REQUEST_METHOD'];
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// Strip a base path if the API isn't served from domain root, e.g. /jnovel-backend/public
 $scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
 if ($scriptDir !== '' && str_starts_with($uri, $scriptDir)) {
     $uri = substr($uri, strlen($scriptDir));
@@ -116,10 +109,6 @@ if ($scriptDir !== '' && str_starts_with($uri, $scriptDir)) {
 $uri = '/' . ltrim($uri, '/');
 $uri = rtrim($uri, '/') ?: '/';
 
-/**
- * Route table: [METHOD, pattern, [Controller, method]]
- * Patterns use {param} placeholders, matched via regex.
- */
 $routes = [
     ['GET', '/api/admin/route-check', static function (): void {
         Response::success(['ok' => true, 'routes' => 'tags-delete-v1']);
@@ -239,11 +228,12 @@ $routes = [
     ['PUT', '/api/admin/novels/{id}/display-views', [AdminController::class, 'updateDisplayViews']],
     ['PUT', '/api/admin/translations/{id}', [AdminController::class, 'updateTranslation']],
 
-    // Admin dashboard — chapters (per language edition)
     ['GET', '/api/admin/translations/{id}/chapters', [AdminController::class, 'listChapters']],
     ['POST', '/api/admin/translations/{id}/chapters', [AdminController::class, 'createChapter']],
     ['PUT', '/api/admin/chapters/{id}', [AdminController::class, 'updateChapter']],
     ['DELETE', '/api/admin/chapters/{id}', [AdminController::class, 'deleteChapter']],
+    ['POST', '/api/chapters/{id}/unlock', [NovelController::class, 'unlockChapter']],
+    ['POST', '/api/chapters/{id}/unlock-ad', [NovelController::class, 'unlockChapterViaAd']],
     ['POST', '/api/admin/translations/{id}/chapters/manuscript', [AdminController::class, 'importManuscript']],
 
     ['GET',  '/api/admin/coin-packages', [AdminController::class, 'listCoinPackages']],
@@ -260,7 +250,7 @@ foreach ($routes as [$routeMethod, $pattern, $handler]) {
 
     $regex = '#^' . preg_replace('/\{[a-zA-Z_]+\}/', '([^/]+)', $pattern) . '$#';
     if (preg_match($regex, $uri, $matches)) {
-        array_shift($matches); // drop full match
+        array_shift($matches);
         if (is_callable($handler)) {
             $handler();
         } else {
